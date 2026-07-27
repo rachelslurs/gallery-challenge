@@ -5,9 +5,10 @@ import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
 import type { Board } from "@/app/api/boards";
 import { COPY } from "@/lib/copy";
 import { cellsInBox, toContentRect } from "@/lib/geometry";
+import { dropTargetAt, moveItems, type DropTarget, type Positioned } from "@/lib/reorder";
 import { resolveClick } from "@/lib/selection";
 import { buildRows, metricsFor, type SectionId, type VRow } from "@/lib/rows";
-import { useAssets } from "@/lib/useAssets";
+import { useAssets, type Asset } from "@/lib/useAssets";
 import { useSelection } from "@/lib/useSelection";
 import { useContainerWidth, useVirtualRange } from "@/lib/useVirtualRange";
 import AssetCell from "./AssetCell";
@@ -82,13 +83,35 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // background click handler would immediately clear what was just selected.
   const marqueeMovedRef = useRef(false);
 
+  /** Flat geometry for hit-testing a single point, as reorder.ts expects. */
+  const allCells = useMemo<Positioned[]>(
+    () =>
+      assetRows.flatMap((row) =>
+        row.cells.map((cell) => ({ id: cell.item.id, x: cell.x, y: cell.y, w: cell.w, h: cell.h })),
+      ),
+    [assetRows],
+  );
+  const allCellsRef = useRef(allCells);
+  allCellsRef.current = allCells;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  const assetIdsRef = useRef(assetIds);
+  assetIdsRef.current = assetIds;
+
+  const dragRef = useRef<{ ids: string[]; startX: number; startY: number; active: boolean } | null>(null);
+  const dropTargetRef = useRef<DropTarget | null>(null);
+  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+
   const shouldStartSelecting = useCallback(
     (target: EventTarget | null): boolean => {
       if (!(target instanceof Element)) return false;
-      // Anywhere inside the wall, including on top of a card, matching how the
-      // real gallery behaves. Drag-to-reorder will therefore need a different
-      // trigger than "pointer down on a card": dragging an already-selected
-      // item moves it, dragging anything else draws a box.
+      // A marquee starts anywhere in the wall, matching the real gallery, with
+      // one exception: pressing an already-selected tile means "move this",
+      // which is how the two gestures stay distinguishable now that a card no
+      // longer owns pointer-down outright.
+      const cell = target.closest<HTMLElement>("[data-asset-id]");
+      const id = cell?.dataset.assetId;
+      if (id && selectedRef.current.has(id)) return false;
       return Boolean(scrollRef.current?.contains(target));
     },
     [scrollRef],
@@ -152,9 +175,97 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // rather than consumed by the next click. Clearing it only when a marquee
   // begins left it set after a marquee ended, which swallowed the following
   // click on a card and made selection need two clicks.
-  const handleMouseDown = useCallback((): void => {
+  const handleMouseDown = useCallback((event: MouseEvent<HTMLDivElement>): void => {
     marqueeMovedRef.current = false;
+
+    // Pressing a selected tile arms a drag. It only becomes one after the
+    // pointer travels far enough, so a plain click still selects.
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest("[data-menu-trigger]")) return;
+    const cell = event.target.closest<HTMLElement>("[data-asset-id]");
+    const id = cell?.dataset.assetId;
+    if (!id || !selectedRef.current.has(id)) return;
+    dragRef.current = {
+      ids: Array.from(selectedRef.current),
+      startX: event.clientX,
+      startY: event.clientY,
+      active: false,
+    };
   }, []);
+
+  /**
+   * Drag-to-reorder. Movement and release are tracked on the window so the
+   * gesture survives the pointer leaving the wall, and the drop indicator is
+   * state while the pointer position is not: re-rendering once per target
+   * change rather than once per pointer move is what keeps this cheap with 761
+   * cells mounted.
+   */
+  useEffect(() => {
+    const DRAG_THRESHOLD_PX = 5;
+
+    const onMove = (event: globalThis.MouseEvent): void => {
+      const drag = dragRef.current;
+      const content = contentRef.current;
+      if (!drag || !content) return;
+
+      if (!drag.active) {
+        const travelled = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
+        if (travelled < DRAG_THRESHOLD_PX) return;
+        drag.active = true;
+      }
+
+      const origin = content.getBoundingClientRect();
+      const next = dropTargetAt(
+        assetIdsRef.current,
+        allCellsRef.current,
+        event.clientX - origin.left,
+        event.clientY - origin.top,
+      );
+      const current = dropTargetRef.current;
+      if (current?.id === next?.id && current?.side === next?.side) return;
+      dropTargetRef.current = next;
+      setDropTarget(next);
+    };
+
+    const onUp = (): void => {
+      const drag = dragRef.current;
+      const target = dropTargetRef.current;
+      dragRef.current = null;
+      dropTargetRef.current = null;
+      setDropTarget(null);
+      if (!drag?.active || !target) return;
+
+      // Reordering is local: the API exposes no write endpoint for asset order.
+      const reordered = moveItems(assetIdsRef.current, drag.ids, target.index);
+      setAssets((previous) => {
+        const byId = new Map(previous.map((asset) => [asset.id, asset]));
+        const next = reordered
+          .map((id) => byId.get(id))
+          .filter((asset): asset is Asset => asset !== undefined);
+        return next.length === previous.length ? next : previous;
+      });
+      // A drag ends in a click; swallow it so the drop does not reselect.
+      marqueeMovedRef.current = true;
+    };
+
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [contentRef, setAssets]);
+
+  const dropIndicator = useMemo(() => {
+    if (!dropTarget) return null;
+    const cell = allCells.find((c) => c.id === dropTarget.id);
+    if (!cell) return null;
+    return {
+      x: dropTarget.side === "before" ? cell.x - 3 : cell.x + cell.w + 1,
+      y: cell.y + 2,
+      h: cell.h - 4,
+    };
+  }, [dropTarget, allCells]);
 
   /**
    * Build a menu target from whatever the pointer landed on. The count comes
@@ -344,6 +455,17 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
             className="relative w-full select-none"
             style={{ height }}
           >
+            {dropIndicator && (
+              <div
+                aria-hidden
+                className="pointer-events-none absolute z-30 w-[3px] rounded-full bg-blue-500"
+                style={{
+                  transform: `translate3d(${dropIndicator.x}px, ${dropIndicator.y}px, 0)`,
+                  height: dropIndicator.h,
+                }}
+              />
+            )}
+
             {visible.map((row) => {
               // A switch narrows the row union exhaustively with no casts. A
               // lookup keyed by `kind` would need one to re-widen the argument.
