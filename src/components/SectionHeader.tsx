@@ -16,12 +16,12 @@ const SectionHeader = ({ section, title, count, collapsed, onToggle }: SectionHe
     type="button"
     onClick={() => onToggle(section)}
     aria-expanded={!collapsed}
-    className="flex h-full w-full items-center gap-2 rounded-md px-1 text-left transition-colors hover:bg-neutral-100"
+    className="flex h-full w-full items-center gap-1.5 rounded px-1 text-left transition-colors hover:bg-neutral-200/60"
   >
     <svg
       viewBox="0 0 16 16"
       className={clsx(
-        "h-4 w-4 shrink-0 text-neutral-500 transition-transform duration-150",
+        "h-3.5 w-3.5 shrink-0 text-neutral-500 transition-transform duration-150",
         collapsed && "-rotate-90",
       )}
       fill="none"
@@ -33,8 +33,10 @@ const SectionHeader = ({ section, title, count, collapsed, onToggle }: SectionHe
     >
       <path d="M4 6l4 4 4-4" />
     </svg>
-    <span className="text-[15px] font-semibold text-neutral-900">{title}</span>
-    <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium tabular-nums text-neutral-600">
+    {/* A small, tracked, uppercase label rather than a heading: the images are
+        the content here, and the section marker should stay quiet. */}
+    <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">{title}</span>
+    <span className="text-xs font-bold tabular-nums tracking-wider text-neutral-400">
       {count.toLocaleString()}
     </span>
   </button>

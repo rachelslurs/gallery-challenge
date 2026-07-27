@@ -23,7 +23,7 @@ const BoardCard = ({ board, width, height, priority }: BoardCardProps) => {
     >
       <div
         className={clsx(
-          "relative flex-1 overflow-hidden rounded-lg bg-neutral-200/70",
+          "relative flex-1 overflow-hidden rounded bg-neutral-200",
           "ring-1 ring-black/5 transition-shadow group-hover:ring-black/15",
         )}
       >
@@ -48,7 +48,7 @@ const BoardCard = ({ board, width, height, priority }: BoardCardProps) => {
         )}
       </div>
 
-      <p className="truncate px-0.5 text-[13px] font-medium leading-tight text-neutral-900">
+      <p className="truncate px-0.5 text-[13px] font-medium leading-tight text-neutral-800">
         {board.title}
       </p>
     </div>

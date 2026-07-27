@@ -11,6 +11,16 @@ const formatDuration = (seconds: number): string => {
   return `${Math.floor(whole / 60)}:${String(whole % 60).padStart(2, "0")}`;
 };
 
+/**
+ * Pixels the image is inset inside its layout cell on every side.
+ *
+ * The cell is what the justified layout positions; the image sits inside it
+ * with a margin. That margin is what the selection ring occupies, so a selected
+ * tile never draws over its neighbour. It also means the visible gap between
+ * two images is the layout gap plus twice this value.
+ */
+const IMAGE_INSET = 4;
+
 export interface AssetCellProps {
   asset: Asset;
   x: number;
@@ -28,18 +38,19 @@ export interface AssetCellProps {
 
 const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) => {
   const isVideo = asset.type === "video";
+  // The image is inset, so it renders narrower than the cell it occupies.
+  const imageWidth = Math.max(1, w - IMAGE_INSET * 2);
 
   return (
     <div
       data-asset-id={asset.id}
-      className="absolute left-0 top-0"
+      className="group absolute left-0 top-0"
       style={{ transform: `translate3d(${x}px, ${y}px, 0)`, width: w, height: h }}
     >
       <div
         className={clsx(
-          "group relative flex h-full w-full flex-col overflow-hidden rounded-md",
-          "transition-colors duration-150",
-          selected ? "bg-neutral-300" : "bg-neutral-200/70",
+          "absolute inset-1 overflow-hidden rounded-xl transition-colors duration-150",
+          selected ? "bg-neutral-300" : "bg-neutral-200",
         )}
       >
         {asset.image ? (
@@ -48,9 +59,9 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           // work the CDN has done, for no gain on a 761-image wall.
           // eslint-disable-next-line @next/next/no-img-element
           <img
-            src={thumbnail(asset.image, w)}
-            srcSet={thumbnailSrcSet(asset.image, w)}
-            sizes={`${Math.ceil(w)}px`}
+            src={thumbnail(asset.image, imageWidth)}
+            srcSet={thumbnailSrcSet(asset.image, imageWidth)}
+            sizes={`${Math.ceil(imageWidth)}px`}
             alt={asset.title}
             loading={priority ? "eager" : "lazy"}
             fetchPriority={priority ? "high" : "auto"}
@@ -65,7 +76,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
         )}
 
         {isVideo && (
-          <div className="pointer-events-none absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[11px] font-medium leading-none text-white">
+          <div className="pointer-events-none absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-medium leading-none tracking-wide text-white">
             <svg viewBox="0 0 8 10" className="h-2.5 w-2.5 fill-current" aria-hidden>
               <path d="M0 0l8 5-8 5z" />
             </svg>
@@ -73,37 +84,32 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           </div>
         )}
 
-        {/*
-          The ring and tint live on an overlay rather than on the container.
-          An inset box-shadow paints beneath its own content, so a ring on the
-          container is hidden by the image that fills it. A sibling declared
-          after the image is what puts the state above the photo.
-
-          The colour is set in exactly one branch: listing ring-transparent and
-          ring-blue-500 together would leave the winner to Tailwind's stylesheet
-          order rather than to this condition. The 2px is always reserved, so
-          selecting changes a colour and never nudges the layout.
-        */}
         <div
           aria-hidden
           className={clsx(
-            "pointer-events-none absolute inset-0 rounded-md",
-            "transition-[background-color,box-shadow] duration-150",
-            // Two stacked inset shadows: a white band against the image, then
-            // blue outside it. Shadows paint first-on-top, so the wider blue
-            // one reads as the outer edge and the white one becomes a gap
-            // between the photo and the ring.
-            //
-            // ring-offset would give the same gap but grows outward, and the
-            // gutter between tiles is only 8px, so an offset ring lands on the
-            // neighbouring image. Insetting keeps it within the cell.
-            selected
-              ? "bg-blue-500/10 shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_6px_#3b82f6]"
-              : "group-hover:bg-black/5",
+            "pointer-events-none absolute inset-0 transition-colors duration-150",
+            selected ? "bg-blue-500/10" : "group-hover:bg-black/5",
           )}
         />
-
       </div>
+
+      {/*
+        The ring sits on the cell edge while the image is inset, so the 4px
+        margin becomes a gap between photo and ring. Its radius is the image's
+        12px plus that 4px inset, which keeps the two curves concentric.
+
+        The colour is set in exactly one branch: listing ring-transparent and
+        ring-blue-500 together would leave the winner to Tailwind's stylesheet
+        order rather than to this condition.
+      */}
+      <div
+        aria-hidden
+        className={clsx(
+          "pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset",
+          "transition-[box-shadow] duration-150",
+          selected ? "ring-blue-500" : "ring-transparent",
+        )}
+      />
     </div>
   );
 };

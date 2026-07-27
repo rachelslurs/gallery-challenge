@@ -218,11 +218,13 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const visible = rows.slice(range[0], range[1]);
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-white text-neutral-900">
-      <header className="flex shrink-0 items-center gap-3 border-b border-neutral-200 px-4 py-3 sm:px-6">
+    <div className="flex h-[100dvh] flex-col bg-neutral-100 text-neutral-900">
+      {/* White chrome over a light grey canvas, so the wall reads as content
+          sitting on a surface rather than as images floating on the page. */}
+      <header className="flex shrink-0 items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[15px] font-semibold leading-tight">{boardTitle}</h1>
-          <p className="mt-0.5 text-xs tabular-nums text-neutral-500">
+          <h1 className="truncate text-2xl font-semibold leading-tight tracking-tight">{boardTitle}</h1>
+          <p className="mt-1 text-xs font-medium tabular-nums text-neutral-600">
             {total > 0 ? COPY.assetCount(total) : COPY.loadingAssets}
             {initialBoards.length > 0 && ` · ${COPY.boardCount(initialBoards.length)}`}
           </p>

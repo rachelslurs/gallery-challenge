@@ -32,16 +32,19 @@ export interface Metrics {
  * a phone still shows several rows at once instead of one image per screenful.
  */
 export function metricsFor(width: number): Metrics {
+  // `gap` is the distance between cells. Each cell insets its image by 4px on
+  // every side (see AssetCell), so the visible gap between two images is the
+  // gap plus 8. Desktop therefore reads as 16px between images.
   if (width < 480) {
-    return { targetHeight: 132, maxHeight: 190, gap: 4, boardColumns: 2, headerHeight: 52 };
+    return { targetHeight: 132, maxHeight: 190, gap: 2, boardColumns: 2, headerHeight: 48 };
   }
   if (width < 768) {
-    return { targetHeight: 168, maxHeight: 240, gap: 6, boardColumns: 3, headerHeight: 56 };
+    return { targetHeight: 168, maxHeight: 240, gap: 4, boardColumns: 3, headerHeight: 52 };
   }
   if (width < 1280) {
-    return { targetHeight: 208, maxHeight: 300, gap: 8, boardColumns: 4, headerHeight: 60 };
+    return { targetHeight: 208, maxHeight: 300, gap: 6, boardColumns: 4, headerHeight: 56 };
   }
-  return { targetHeight: 248, maxHeight: 360, gap: 8, boardColumns: 5, headerHeight: 60 };
+  return { targetHeight: 248, maxHeight: 360, gap: 8, boardColumns: 5, headerHeight: 56 };
 }
 
 /** Board cards are a uniform grid: a 4:3 thumbnail plus a fixed label strip. */
