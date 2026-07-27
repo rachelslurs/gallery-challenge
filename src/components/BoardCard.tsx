@@ -23,12 +23,12 @@ const BoardCard = ({ board, width, height, priority, highlighted = false, select
   return (
     <div
       data-board-id={board.id}
-      className="group flex cursor-pointer flex-col gap-2"
+      className="group cursor-pointer"
       style={{ width, height }}
     >
       <div
         className={clsx(
-          "relative flex-1 overflow-hidden rounded bg-neutral-200",
+          "relative h-full w-full overflow-hidden rounded-xl bg-neutral-200",
           "transition-shadow duration-150",
           blocked
             ? "ring-2 ring-red-500 ring-offset-2 ring-offset-neutral-100"
@@ -56,11 +56,19 @@ const BoardCard = ({ board, width, height, priority, highlighted = false, select
             </svg>
           </div>
         )}
+
+        {/*
+          The title sits on the image over a gradient, as the reference does,
+          rather than on a label strip below it. That is what lets the card be a
+          fixed height at every width.
+        */}
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-[linear-gradient(to_top,rgba(0,0,0,0.75),transparent)] px-2 pb-2 pt-6">
+          <p className="truncate text-lg font-semibold leading-6 tracking-[-0.014em] text-white">
+            {board.title}
+          </p>
+        </div>
       </div>
 
-      <p className="truncate px-0.5 text-[13px] font-medium leading-tight text-neutral-800">
-        {board.title}
-      </p>
     </div>
   );
 };

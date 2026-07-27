@@ -53,6 +53,10 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
       data-asset-id={asset.id}
       className={clsx(
         "group absolute left-0 top-0",
+        // Positions are content coordinates, so scrolling leaves a transform
+        // untouched. The only things that move a tile are a reorder and a
+        // resize, which is precisely when the movement is worth showing.
+        "transition-transform duration-200 ease-out",
         // The ring sits on the cell edge while the image is inset, so the 4px
         // margin reads as a gap between photo and ring. Its radius is the
         // image's 12px plus that inset, keeping the two curves concentric.
@@ -134,12 +138,14 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
             // Arbitrary values on purpose: this project pins Tailwind 3.3,
             // where min-h-24 does not exist and the gradient-stop utilities
             // silently produced no background-image.
-            "min-h-[84px] bg-[linear-gradient(to_top,rgba(0,0,0,0.85),transparent)]",
+            "min-h-[96px] bg-[linear-gradient(to_top,rgba(0,0,0,0.85),transparent)]",
             "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
           )}
         >
-          <p className="truncate text-xs font-medium leading-4 text-white">{asset.title}</p>
-          <p className="truncate text-[11px] leading-4 text-white/70">
+          <p className="truncate text-base font-medium leading-6 tracking-[-0.011em] text-white">
+            {asset.title}
+          </p>
+          <p className="truncate text-xs font-normal leading-[18px] text-white">
             {asset.meta}
           </p>
         </div>

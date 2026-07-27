@@ -45,7 +45,7 @@ const SectionHeader = ({ section, title, count, collapsed, onToggle }: SectionHe
     {/* A small, tracked, uppercase label rather than a heading: the images are
         the content here, and the section marker should stay quiet. */}
     <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">{title}</span>
-    <span className="text-xs font-bold tabular-nums tracking-wider text-neutral-400">
+    <span className="text-xs font-bold tabular-nums tracking-wider text-neutral-500">
       {count.toLocaleString()}
     </span>
   </button>

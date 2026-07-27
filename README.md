@@ -10,7 +10,7 @@ Repo: https://github.com/rachelslurs/gallery-challenge
 ```bash
 npm install
 npm run dev    # http://localhost:3000
-npm test       # 113 tests, ~400ms
+npm test       # 104 tests, ~400ms
 ```
 
 ## Requirements status
@@ -22,7 +22,8 @@ npm test       # 113 tests, ~400ms
 | Marquee selection | Done, via `@air/react-drag-to-select` |
 | Drag to reorder | Done |
 | Drag assets into a sub-board | Done, local only: the API has no write endpoint |
-| Ellipsis buttons and context menus | Done, both reflect the selection count |
+| Ellipsis menu on hover | Done, reflects the selection count |
+| Context menu on right click | Done, same menu and count |
 
 All seven landed. Reordering and moving are local: the endpoints are read-only, so
 there is nothing to persist to.
@@ -44,7 +45,8 @@ Points 2 and 3 are the same binary search over the same array.
 
 ## Measured performance
 
-Every number below is measured, on the deployed build, with Chrome DevTools.
+Taken with Chrome DevTools against a local production build, with all 761
+assets loaded.
 
 | Measurement | Result |
 | --- | --- |
@@ -54,7 +56,7 @@ Every number below is measured, on the deployed build, with Chrome DevTools.
 | Video elements at rest | 0; a preview mounts on hover and unmounts on leave, one at most |
 | Cumulative layout shift | 0.00; every cell's height is known before its image loads |
 | Sample photo payload | 1.4MB original; 541KB at imgix defaults; 30KB at `w=400` |
-| Production LCP | ~278ms |
+| Production LCP, unthrottled | 278ms and 415ms on two runs of the same build |
 | Production TTFB | 2-3ms; the route is statically prerendered with `revalidate = 300` |
 
 ## Decisions
@@ -81,27 +83,32 @@ differently.
 
 **Design values measured from the reference board with devtools**, then expressed in the standard Tailwind scale: 16px between images, a 28px outer gutter, roughly 250px rows at every breakpoint, 12px radii, 15px below a section label and 39px above the next one. A narrow viewport gets fewer images per row at the same row height.
 
-**All mutations would be local.** The public API has no write endpoints, so any reordering or moving is optimistic by necessity.
+The board grid fills columns to a 184px minimum rather than dividing the width
+evenly, so four boards on a wide screen sit at their natural size and
+left-align instead of stretching. Card height is fixed, which is why a card is
+wider than tall on a tablet and taller than wide on a desktop. Reproduced
+exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
+227x196 with 16px on a tablet, 7 at 184x196 on a desktop.
 
 ## Beyond the brief
 
-- 113 unit tests over the pure geometry, using differential oracles: the binary searches and marquee hit-testing are checked against brute-force scans rather than fixed expectations, so a wrong oracle fails loudly. The suite caught a real bug where a stranded panorama rendered 2112px wide inside a 320px column.
+- 104 unit tests over the pure geometry, using differential oracles: the binary searches and marquee hit-testing are checked against brute-force scans rather than fixed expectations, so a wrong oracle fails loudly. The suite caught a real bug where a stranded panorama rendered 2112px wide inside a 320px column.
 - GitHub Actions CI runs typecheck, lint, tests, and build. A Lighthouse workflow gates on accessibility plus two deterministic performance audits, `cumulative-layout-shift` and `dom-size`. The dom-size budget is the cheapest regression test for the virtualization: un-windowing the list would blow past it, and no unit test would notice.
 - Keyboard and modifier selection: shift for ranges, cmd to toggle, cmd+A, Escape. Only marquee selection was asked for.
 - Rotation-aware dimension swapping for assets rotated 90 or 270 degrees.
 - Duplicate-id dedup across cursor page boundaries.
 - Marquee disabled on coarse pointers.
 - Video previews play on hover, using the `previewVideo` asset the API already returns alongside the poster frame.
+- Filename and specifications appear over a gradient on hover, matched to the reference down to type size, weight, tracking and padding.
+- Tiles animate to their new positions after a reorder. Positions are content coordinates, so scrolling never changes a transform and only a reorder or a resize triggers the transition.
 - Boards are selectable alongside assets, and their rects are derived from the row model rather than measured.
-- Dragging a board onto a board is refused visibly: the destination turns red and the action bar explains why, rather than the gesture silently doing nothing.
+- Dragging a board onto a board is refused visibly: the destination turns red and the action bar explains why, rather than the gesture silently doing nothing. A mixed selection moves only its assets.
 - One floating action bar owns everything transient, so the selection count, the undo after a move, and a refusal can never stack or fight for the same corner.
 - `.nvmrc` moved from the starter's 18.17.0 to 22.20.0, a deliberate deviation: vitest 4 requires Node 20 or later, so a CI run honoring the starter's pin would have failed before running a single test.
 
 ## Known gaps
 
-- Boards can be selected and dropped onto, but not moved into one another. Attempting it turns the destination red and explains the refusal rather than failing silently. A mixed selection moves only its assets.
 - Shift-click ranges and cmd+A cover assets only. The selection holds both kinds but the ordered list behind ranges is the asset list, so a range spanning a board and an asset does nothing sensible.
 - Download and Share were removed from the action bar rather than left inert: neither has an endpoint behind it.
 - No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.
-- Lighthouse performance scores 89. The entire deficit is LCP: TBT is 24ms, CLS 0.001, FCP 0.77s, Speed Index 1.04s, all scoring 1.00. LCP is 3.77s and 82% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 94; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms.
-- The prerendered HTML contains no `<img>` tags, because the wall is virtualized and the visible range is empty without a scroll container. Air's own app has the same property: I checked, and its initial HTML contains one img, a workspace logo.
+- Lighthouse performance scores 89. The entire deficit is LCP: TBT is 24ms, CLS 0.001, FCP 0.77s, Speed Index 1.04s, all scoring 1.00. LCP is 3.77s and 82% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 94; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms. Air's own app prerenders no tiles either: its initial HTML contains one img, a workspace logo.

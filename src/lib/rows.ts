@@ -30,7 +30,29 @@ export interface Metrics {
   headerGap: number;
   /** Space above a section label when content precedes it. */
   sectionGap: number;
+  /** Board cards use their own gap and a fixed height, unlike the asset wall. */
+  boardGap: number;
+  boardCardHeight: number;
 }
+
+/**
+ * Board grid, matching the reference: columns are filled to a minimum width
+ * rather than divided evenly, so four boards on a wide screen sit at their
+ * natural size and left-align instead of stretching across the viewport. Card
+ * height is fixed, so a card is wider than tall on a tablet and taller than
+ * wide on a desktop.
+ */
+const BOARD_MIN_WIDTH = 184;
+
+const boardGridFor = (width: number): { boardGap: number; boardColumns: number; boardCardHeight: number } => {
+  if (width < 480) return { boardGap: 8, boardColumns: 2, boardCardHeight: 160 };
+  const boardGap = 16;
+  return {
+    boardGap,
+    boardColumns: Math.max(1, Math.floor((width + boardGap) / (BOARD_MIN_WIDTH + boardGap))),
+    boardCardHeight: 196,
+  };
+};
 
 /**
  * Vertical rhythm around section labels, measured from the reference gallery at
@@ -65,20 +87,15 @@ export function metricsFor(width: number): Metrics {
   // are therefore set about a quarter above the ~240px the reference gallery
   // actually renders.
   if (width < 480) {
-    return { targetHeight: 230, maxHeight: 290, gap: 0, boardColumns: 2, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
+    return { targetHeight: 230, maxHeight: 290, gap: 0, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP, ...boardGridFor(width) };
   }
   if (width < 768) {
-    return { targetHeight: 240, maxHeight: 300, gap: 8, boardColumns: 3, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
+    return { targetHeight: 240, maxHeight: 300, gap: 8, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP, ...boardGridFor(width) };
   }
   if (width < 1280) {
-    return { targetHeight: 255, maxHeight: 320, gap: 8, boardColumns: 4, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
+    return { targetHeight: 255, maxHeight: 320, gap: 8, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP, ...boardGridFor(width) };
   }
-  return { targetHeight: 260, maxHeight: 325, gap: 8, boardColumns: 5, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
-}
-
-/** Board cards are a uniform grid: a 4:3 thumbnail plus a fixed label strip. */
-export function boardCardHeight(cardWidth: number): number {
-  return Math.round(cardWidth * 0.72) + 44;
+  return { targetHeight: 260, maxHeight: 325, gap: 8, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP, ...boardGridFor(width) };
 }
 
 export interface BuildRowsInput {
@@ -107,7 +124,7 @@ export function buildRows({
   hasMore,
   loading,
 }: BuildRowsInput): BuiltRows {
-  const { gap, headerHeight, headerGap, sectionGap, boardColumns, targetHeight, maxHeight } = metrics;
+  const { gap, headerHeight, headerGap, sectionGap, boardColumns, boardGap, boardCardHeight, targetHeight, maxHeight } = metrics;
   const rows: VRow[] = [];
   let y = 0;
 
@@ -126,14 +143,13 @@ export function buildRows({
 
     if (!collapsed.boards) {
       const columns = Math.max(1, boardColumns);
-      const cardWidth = (containerWidth - gap * (columns - 1)) / columns;
-      const cardHeight = boardCardHeight(cardWidth);
+      const cardWidth = (containerWidth - boardGap * (columns - 1)) / columns;
       for (let i = 0; i < boards.length; i += columns) {
         push({
           kind: "boards",
           id: `boards-${i}`,
           index: i / columns,
-          h: cardHeight,
+          h: boardCardHeight,
           boards: boards.slice(i, i + columns),
           cardWidth,
         });

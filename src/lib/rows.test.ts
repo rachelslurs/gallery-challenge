@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Board } from "../app/api/boards";
 import {
-  boardCardHeight,
   buildRows,
   metricsFor,
   type BuildRowsInput,
@@ -107,8 +106,8 @@ describe("buildRows layout", () => {
     const assetRows = rows.filter(
       (row): row is Extract<VRow, { kind: "assets" }> => row.kind === "assets",
     );
-    // 7 boards over 4 columns is 2 grid rows; 60 assets fill many wall rows.
-    expect(boardRows.length).toBe(2);
+    // 768px of content fits 3 board columns, so 7 boards take 3 grid rows.
+    expect(boardRows.length).toBe(3);
     expect(assetRows.length).toBeGreaterThan(2);
     boardRows.forEach((row, i) => expect(row.index).toBe(i));
     assetRows.forEach((row, i) => expect(row.index).toBe(i));
@@ -196,10 +195,22 @@ describe("metricsFor", () => {
   });
 });
 
-describe("boardCardHeight", () => {
-  it("grows with card width and always clears the label strip", () => {
-    expect(boardCardHeight(200)).toBeGreaterThan(boardCardHeight(100));
-    // Zero-width card still reserves the 44px label strip.
-    expect(boardCardHeight(0)).toBe(44);
+describe("board grid", () => {
+  it("fills columns to a minimum width rather than dividing evenly", () => {
+    // Four boards on a wide viewport sit at their natural size and leave the
+    // rest of the row empty, instead of stretching across it.
+    expect(metricsFor(1384).boardColumns).toBeGreaterThan(4);
+    expect(metricsFor(712).boardColumns).toBe(3);
+  });
+
+  it("uses a shorter card and a tighter gap on phones", () => {
+    expect(metricsFor(366).boardCardHeight).toBeLessThan(metricsFor(1384).boardCardHeight);
+    expect(metricsFor(366).boardGap).toBeLessThan(metricsFor(1384).boardGap);
+  });
+
+  it("never returns fewer than one column", () => {
+    for (const width of [0, 1, 100, 320, 480, 1440, 5000]) {
+      expect(metricsFor(width).boardColumns).toBeGreaterThanOrEqual(1);
+    }
   });
 });

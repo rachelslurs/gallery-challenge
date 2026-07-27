@@ -1,5 +1,6 @@
 "use client";
 
+import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
 import type { Board } from "@/app/api/boards";
@@ -108,7 +109,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       row.boards.forEach((board, column) => {
         out.push({
           id: board.id,
-          x: column * (row.cardWidth + metrics.gap),
+          x: column * (row.cardWidth + metrics.boardGap),
           y: row.y,
           w: row.cardWidth,
           h: row.h,
@@ -116,7 +117,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       });
     }
     return out;
-  }, [rows, metrics.gap]);
+  }, [rows, metrics.boardGap]);
   const boardCellsRef = useRef(boardCells);
   boardCellsRef.current = boardCells;
 
@@ -550,7 +551,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
           sitting on a surface rather than as images floating on the page. */}
       <header className="flex shrink-0 items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3 sm:px-6 sm:py-4">
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-2xl font-semibold leading-tight tracking-tight">{boardTitle}</h1>
+          <h1 className="truncate text-2xl font-semibold leading-tight tracking-tight text-neutral-800">{boardTitle}</h1>
           <p className="mt-1 text-xs font-medium tabular-nums text-neutral-600">
             {total > 0 ? COPY.assetCount(total) : COPY.loadingAssets}
             {initialBoards.length > 0 && ` · ${COPY.boardCount(initialBoards.length)}`}
@@ -589,7 +590,13 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
             {dropIndicator && (
               <div
                 aria-hidden
-                className="pointer-events-none absolute z-30 w-[3px] rounded-full bg-blue-500"
+                className={clsx(
+                  "pointer-events-none absolute z-30 w-1 rounded-full bg-blue-500",
+                  // A white hairline lifts it off whatever photograph sits
+                  // behind, and the glow makes it findable in peripheral vision
+                  // while the eye is on the dragged tile.
+                  "shadow-[0_0_0_1.5px_rgba(255,255,255,0.95),0_0_14px_rgba(59,130,246,0.85)]",
+                )}
                 style={{
                   transform: `translate3d(${dropIndicator.x}px, ${dropIndicator.y}px, 0)`,
                   height: dropIndicator.h,
@@ -626,7 +633,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                       style={{
                         transform: `translate3d(0, ${row.y}px, 0)`,
                         height: row.h,
-                        gap: metrics.gap,
+                        gap: metrics.boardGap,
                       }}
                     >
                       {row.boards.map((board) => (
