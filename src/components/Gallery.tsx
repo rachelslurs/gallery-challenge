@@ -1,10 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
+import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
 import type { Board } from "@/app/api/boards";
 import { COPY } from "@/lib/copy";
+import { cellsInBox } from "@/lib/geometry";
 import { buildRows, metricsFor, type SectionId, type VRow } from "@/lib/rows";
 import { useAssets } from "@/lib/useAssets";
+import { useSelection } from "@/lib/useSelection";
 import { useContainerWidth, useVirtualRange } from "@/lib/useVirtualRange";
 import AssetCell from "./AssetCell";
 import BoardCard from "./BoardCard";
@@ -19,6 +22,9 @@ const PREFETCH_ROWS = 4;
  */
 const EAGER_ASSET_ROWS = 2;
 const EAGER_BOARD_ROWS = 1;
+
+type AssetRow = Extract<VRow, { kind: "assets" }>;
+const isAssetRow = (row: VRow): row is AssetRow => row.kind === "assets";
 
 const STATUS_COPY: Record<Extract<VRow, { kind: "status" }>["state"], string> = {
   loading: COPY.loadingMore,
@@ -36,10 +42,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     boards: false,
     assets: false,
   });
-  const [selected] = useState<ReadonlySet<string>>(() => new Set<string>());
+  const [marqueeEnabled, setMarqueeEnabled] = useState(true);
 
   const { assets, total, hasMore, loading, error, loadMore, retry } = useAssets();
   const { ref: contentRef, width } = useContainerWidth<HTMLDivElement>();
+
+  const assetIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
+  const { selected, count, selectOnly, toggle, extendTo, selectAll, clear, beginMarquee, applyMarquee } =
+    useSelection(assetIds);
 
   const metrics = useMemo(() => metricsFor(width), [width]);
   const { rows, height } = useMemo(
@@ -57,11 +67,97 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     [initialBoards, assets, width, metrics, collapsed, total, hasMore, loading],
   );
 
+  const assetRows = useMemo(() => rows.filter(isAssetRow), [rows]);
+
   const { scrollRef, range, onScroll } = useVirtualRange(rows, OVERSCAN);
+
+  // Read geometry through a ref so the marquee callbacks keep a stable identity
+  // and are not rebound on every loaded page.
+  const assetRowsRef = useRef(assetRows);
+  assetRowsRef.current = assetRows;
+  // A marquee ends with a mouseup that also fires a click. Without this the
+  // background click handler would immediately clear what was just selected.
+  const marqueeMovedRef = useRef(false);
+
+  const shouldStartSelecting = useCallback((target: EventTarget | null): boolean => {
+    if (!(target instanceof Element)) return false;
+    if (!scrollRef.current?.contains(target)) return false;
+    // Cards own the pointer-down gesture so drag-to-reorder stays available.
+    return target.closest("[data-asset-id], [data-board-id]") === null;
+  }, [scrollRef]);
+
+  const handleSelectionStart = useCallback(
+    (event: MouseEvent | globalThis.MouseEvent): void => {
+      marqueeMovedRef.current = false;
+      beginMarquee(event.shiftKey || event.metaKey || event.ctrlKey);
+    },
+    [beginMarquee],
+  );
+
+  const handleSelectionChange = useCallback(
+    (box: Box): void => {
+      const content = contentRef.current;
+      if (!content) return;
+
+      // getBoundingClientRect is live, so the element's own offset already
+      // reflects scroll position. The box arrives in viewport coordinates.
+      const origin = content.getBoundingClientRect();
+      const hits = cellsInBox(assetRowsRef.current, {
+        left: box.left - origin.left,
+        top: box.top - origin.top,
+        width: box.width,
+        height: box.height,
+      });
+
+      marqueeMovedRef.current = true;
+      applyMarquee(hits.map((cell) => cell.item.id));
+    },
+    [applyMarquee, contentRef],
+  );
+
+  const { DragSelection } = useSelectionContainer({
+    isEnabled: marqueeEnabled,
+    shouldStartSelecting,
+    onSelectionStart: handleSelectionStart,
+    onSelectionChange: handleSelectionChange,
+    selectionProps: {
+      style: {
+        border: "1px solid rgb(59 130 246)",
+        background: "rgba(59, 130, 246, 0.16)",
+        borderRadius: 2,
+      },
+    },
+  });
 
   const toggleSection = useCallback((section: SectionId): void => {
     setCollapsed((previous) => ({ ...previous, [section]: !previous[section] }));
   }, []);
+
+  // One delegated handler rather than a callback prop on each of 761 cells,
+  // which would defeat their memoization.
+  const handleClick = useCallback(
+    (event: MouseEvent<HTMLDivElement>): void => {
+      if (marqueeMovedRef.current) {
+        marqueeMovedRef.current = false;
+        return;
+      }
+      if (!(event.target instanceof Element)) return;
+
+      const cell = event.target.closest("[data-asset-id]");
+      if (!(cell instanceof HTMLElement)) {
+        clear();
+        return;
+      }
+
+      const id = cell.dataset.assetId;
+      if (!id) return;
+
+      if (event.shiftKey) extendTo(id);
+      else if (event.metaKey || event.ctrlKey) toggle(id);
+      else selectOnly(id);
+    },
+    [clear, extendTo, toggle, selectOnly],
+  );
 
   // Depends on `rows.length` as well as the visible range: a scroll that stops
   // exactly at a page boundary changes neither the range nor the scroll position
@@ -70,6 +166,29 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     if (!hasMore || loading || error || collapsed.assets) return;
     if (range[1] >= rows.length - PREFETCH_ROWS) loadMore();
   }, [range, rows.length, hasMore, loading, error, collapsed.assets, loadMore]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(pointer: coarse)");
+    const update = (): void => setMarqueeEnabled(!query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === "Escape") {
+        clear();
+        return;
+      }
+      if (event.key === "a" && (event.metaKey || event.ctrlKey)) {
+        event.preventDefault();
+        selectAll();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [clear, selectAll]);
 
   const visible = rows.slice(range[0], range[1]);
 
@@ -83,11 +202,26 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
             {initialBoards.length > 0 && ` · ${COPY.boardCount(initialBoards.length)}`}
           </p>
         </div>
+        {count > 0 && (
+          <button
+            type="button"
+            onClick={clear}
+            className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium tabular-nums text-white transition-colors hover:bg-blue-700"
+          >
+            {COPY.selectedCount(count)}
+          </button>
+        )}
       </header>
 
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-x-hidden overflow-y-auto">
         <div className="px-3 py-3 sm:px-6 sm:py-4">
-          <div ref={contentRef} className="relative w-full" style={{ height }}>
+          <DragSelection />
+          <div
+            ref={contentRef}
+            onClick={handleClick}
+            className="relative w-full select-none"
+            style={{ height }}
+          >
             {visible.map((row) => {
               // A switch narrows the row union exhaustively with no casts. A
               // lookup keyed by `kind` would need one to re-widen the argument.
