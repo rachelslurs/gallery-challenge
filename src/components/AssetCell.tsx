@@ -87,9 +87,19 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
         <div
           aria-hidden
           className={clsx(
-            "pointer-events-none absolute inset-0 rounded-md ring-2 ring-inset",
+            "pointer-events-none absolute inset-0 rounded-md",
             "transition-[background-color,box-shadow] duration-150",
-            selected ? "bg-blue-500/10 ring-blue-500" : "ring-transparent group-hover:bg-black/5",
+            // Two stacked inset shadows: a white band against the image, then
+            // blue outside it. Shadows paint first-on-top, so the wider blue
+            // one reads as the outer edge and the white one becomes a gap
+            // between the photo and the ring.
+            //
+            // ring-offset would give the same gap but grows outward, and the
+            // gutter between tiles is only 8px, so an offset ring lands on the
+            // neighbouring image. Insetting keeps it within the cell.
+            selected
+              ? "bg-blue-500/10 shadow-[inset_0_0_0_3px_#fff,inset_0_0_0_6px_#3b82f6]"
+              : "group-hover:bg-black/5",
           )}
         />
 
