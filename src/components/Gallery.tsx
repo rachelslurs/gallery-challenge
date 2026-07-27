@@ -6,10 +6,11 @@ import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
 import { boardUrl, type Board } from "@/app/api/boards";
 import { COPY } from "@/lib/copy";
 import { cellsInBox, toContentRect } from "@/lib/geometry";
-import { dropTargetAt, moveItems, type DropTarget, type Positioned } from "@/lib/reorder";
+import { moveItems, type Positioned } from "@/lib/reorder";
 import { resolveClick } from "@/lib/selection";
 import { buildRows, metricsFor, type SectionId, type VRow } from "@/lib/rows";
 import { useAssets, type Asset } from "@/lib/useAssets";
+import { useAssetDrag } from "@/lib/useAssetDrag";
 import { useSelection } from "@/lib/useSelection";
 import { useContainerWidth, useVirtualRange } from "@/lib/useVirtualRange";
 import AssetCell from "./AssetCell";
@@ -132,18 +133,6 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const assetIdsRef = useRef(assetIds);
   assetIdsRef.current = assetIds;
 
-  const dragRef = useRef<{
-    kind: "assets" | "board";
-    ids: string[];
-    startX: number;
-    startY: number;
-    active: boolean;
-  } | null>(null);
-  const dropTargetRef = useRef<DropTarget | null>(null);
-  const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
-  const hoverBoardRef = useRef<string | null>(null);
-  const [hoverBoard, setHoverBoard] = useState<string | null>(null);
-  const [dragKind, setDragKind] = useState<"assets" | "board" | null>(null);
   const [marqueeActive, setMarqueeActive] = useState(false);
   // Snapshot for undo. There is no write endpoint, so a move is a local
   // filter and reversing it means restoring the previous array wholesale.
@@ -236,198 +225,51 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // rather than consumed by the next click. Clearing it only when a marquee
   // begins left it set after a marquee ended, which swallowed the following
   // click on a card and made selection need two clicks.
-  const handleMouseDown = useCallback((event: MouseEvent<HTMLDivElement>): void => {
-    marqueeMovedRef.current = false;
-
-    // Secondary buttons open the context menu. Without this they also armed a
-    // drag, so a right-drag committed a reorder behind the open menu.
-    if (event.button !== 0) {
-      dragRef.current = null;
-      setDragKind(null);
-      return;
-    }
-
-    // Pressing a selected tile arms a drag. It only becomes one after the
-    // pointer travels far enough, so a plain click still selects.
-    if (!(event.target instanceof Element)) return;
-    if (event.target.closest("[data-menu-trigger]")) return;
-    const boardEl = event.target.closest<HTMLElement>("[data-board-id]");
-    const boardId = boardEl?.dataset.boardId;
-    if (boardId && selectedRef.current.has(boardId)) {
-      // Armed only so the gesture can be refused visibly. Silently doing
-      // nothing reads as broken rather than disallowed.
-      dragRef.current = { ids: [], startX: event.clientX, startY: event.clientY, active: false, kind: "board" };
-      setDragKind("board");
-      return;
-    }
-
-    const cell = event.target.closest<HTMLElement>("[data-asset-id]");
-    const id = cell?.dataset.assetId;
-    if (!id || !selectedRef.current.has(id)) return;
-    setDragKind("assets");
-    dragRef.current = {
-      kind: "assets",
-      // Boards can be selected but not dragged, so a mixed selection moves only
-      // its assets.
-      ids: Array.from(selectedRef.current).filter((selectedId) =>
-        assetIdsRef.current.includes(selectedId),
-      ),
-      startX: event.clientX,
-      startY: event.clientY,
-      active: false,
-    };
-  }, []);
-
-  /**
-   * Drag-to-reorder. Movement and release are tracked on the window so the
-   * gesture survives the pointer leaving the wall, and the drop indicator is
-   * state while the pointer position is not: re-rendering once per target
-   * change rather than once per pointer move is what keeps this cheap with 761
-   * cells mounted.
-   */
-  useEffect(() => {
-    const DRAG_THRESHOLD_PX = 5;
-    let frame = 0;
-    let pending: { x: number; y: number; buttons: number } | null = null;
-
-    const process = (): void => {
-      frame = 0;
-      const point = pending;
-      pending = null;
-      if (point === null) return;
-      const event = { clientX: point.x, clientY: point.y, buttons: point.buttons };
-
-      const drag = dragRef.current;
-      const content = contentRef.current;
-      if (!drag || !content) return;
-
-      // The button was released somewhere this window never saw. Abandon the
-      // gesture rather than letting plain movement resume it.
-      if ((event.buttons & 1) === 0) {
-        dragRef.current = null;
-        dropTargetRef.current = null;
-        hoverBoardRef.current = null;
-        setDragKind(null);
-        setDropTarget(null);
-        setHoverBoard(null);
-        return;
-      }
-
-      if (!drag.active) {
-        const travelled = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
-        if (travelled < DRAG_THRESHOLD_PX) return;
-        drag.active = true;
-      }
-
-      // A board under the pointer takes precedence: dropping onto one moves the
-      // assets there, so an insertion point would be misleading.
-      if (drag.kind === "board") {
-        const overBoard = document
-          .elementFromPoint(event.clientX, event.clientY)
-          ?.closest<HTMLElement>("[data-board-id]");
-        const id = overBoard?.dataset.boardId ?? null;
-        if (id !== hoverBoardRef.current) {
-          hoverBoardRef.current = id;
-          setHoverBoard(id);
-        }
-        return;
-      }
-
-      const under = document.elementFromPoint(event.clientX, event.clientY);
-      const boardEl = under?.closest<HTMLElement>("[data-board-id]") ?? null;
-      const boardId = boardEl?.dataset.boardId ?? null;
-      if (boardId !== hoverBoardRef.current) {
-        hoverBoardRef.current = boardId;
-        setHoverBoard(boardId);
-      }
-      if (boardId) {
-        if (dropTargetRef.current) {
-          dropTargetRef.current = null;
-          setDropTarget(null);
-        }
-        return;
-      }
-
-      const origin = content.getBoundingClientRect();
-      const next = dropTargetAt(
-        assetIdsRef.current,
-        allCellsRef.current,
-        event.clientX - origin.left,
-        event.clientY - origin.top,
-      );
-      const current = dropTargetRef.current;
-      if (current?.id === next?.id && current?.side === next?.side) return;
-      dropTargetRef.current = next;
-      setDropTarget(next);
-    };
-
-    // Raw mousemove outruns paint, and each event would otherwise cost a forced
-    // hit-test plus a scan of every cell. One frame, one evaluation.
-    const onMove = (event: globalThis.MouseEvent): void => {
-      if (!dragRef.current) return;
-      pending = { x: event.clientX, y: event.clientY, buttons: event.buttons };
-      if (frame) return;
-      frame = requestAnimationFrame(process);
-    };
-
-    const onUp = (): void => {
-      if (frame) {
-        cancelAnimationFrame(frame);
-        frame = 0;
-      }
-      pending = null;
-      const drag = dragRef.current;
-      const target = dropTargetRef.current;
-      const boardId = hoverBoardRef.current;
-      dragRef.current = null;
-      dropTargetRef.current = null;
-      hoverBoardRef.current = null;
-      setDragKind(null);
-      setDropTarget(null);
-      setHoverBoard(null);
-      if (!drag?.active) return;
-
-      if (drag.kind === "board") {
-        if (boardId) setNotice(COPY.boardIntoBoard);
-        marqueeMovedRef.current = true;
-        return;
-      }
-
-      if (boardId) {
-        const moving = new Set(drag.ids);
+  const drag = useAssetDrag({
+    contentRef,
+    orderedIds: assetIds,
+    cells: allCells,
+    selected,
+    onReorder: useCallback(
+      (movingIds, insertIndex) => {
+        // Reordering is local: the API exposes no write endpoint for order.
+        const reordered = moveItems(assetIdsRef.current, movingIds, insertIndex);
+        setAssets((previous) => {
+          const byId = new Map(previous.map((asset) => [asset.id, asset]));
+          const next = reordered
+            .map((id) => byId.get(id))
+            .filter((asset): asset is Asset => asset !== undefined);
+          return next.length === previous.length ? next : previous;
+        });
+      },
+      [setAssets],
+    ),
+    onDropOnBoard: useCallback(
+      (boardId, movingIds) => {
+        const moving = new Set(movingIds);
         setAssets((previous) => {
           undoRef.current = previous;
           return previous.filter((asset) => !moving.has(asset.id));
         });
-        setMoved({ count: drag.ids.length, board: boardTitleById.get(boardId) ?? "" });
+        setMoved({ count: movingIds.length, board: boardTitleById.get(boardId) ?? "" });
         clear();
-        marqueeMovedRef.current = true;
-        return;
-      }
-
-      if (!target) return;
-
-      // Reordering is local: the API exposes no write endpoint for asset order.
-      const reordered = moveItems(assetIdsRef.current, drag.ids, target.index);
-      setAssets((previous) => {
-        const byId = new Map(previous.map((asset) => [asset.id, asset]));
-        const next = reordered
-          .map((id) => byId.get(id))
-          .filter((asset): asset is Asset => asset !== undefined);
-        return next.length === previous.length ? next : previous;
-      });
-      // A drag ends in a click; swallow it so the drop does not reselect.
+      },
+      [setAssets, boardTitleById, clear],
+    ),
+    onRefused: useCallback(() => setNotice(COPY.boardIntoBoard), []),
+    // A drag ends in a click; swallow it so the drop does not reselect.
+    onGestureCommitted: useCallback(() => {
       marqueeMovedRef.current = true;
-    };
+    }, []),
+  });
 
-    window.addEventListener("mousemove", onMove);
-    window.addEventListener("mouseup", onUp);
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener("mousemove", onMove);
-      window.removeEventListener("mouseup", onUp);
-    };
-  }, [contentRef, setAssets, clear, boardTitleById]);
+  const handleMouseDown = useCallback(
+    (event: MouseEvent<HTMLDivElement>): void => {
+      marqueeMovedRef.current = false;
+      drag.onMouseDown(event);
+    },
+    [drag],
+  );
 
   useEffect(() => {
     if (!notice) return;
@@ -458,7 +300,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     return () => window.clearTimeout(timer);
   }, [moved]);
 
-  const blockedDrag = dragKind === "board";
+  const blockedDrag = drag.kind === "board";
   // Boards live in the same selection set, so the split has to be derived.
   const selectedAssetCount = useMemo(
     () => assetIds.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0),
@@ -472,10 +314,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   */
   useEffect(() => {
     const gesture =
-      dragKind === "board" && hoverBoard
+      drag.kind === "board" && drag.hoverBoardId
         ? "refused"
-        : dragKind === "assets"
-          ? hoverBoard
+        : drag.kind === "assets"
+          ? drag.hoverBoardId
             ? "drop"
             : "reorder"
           : marqueeActive
@@ -490,11 +332,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     return () => {
       delete document.body.dataset.gesture;
     };
-  }, [dragKind, hoverBoard, marqueeActive]);
+  }, [drag.kind, drag.hoverBoardId, marqueeActive]);
 
   const dropIndicator = useMemo(() => {
-    if (!dropTarget) return null;
-    const cell = allCells.find((c) => c.id === dropTarget.id);
+    if (!drag.dropTarget) return null;
+    const cell = allCells.find((c) => c.id === drag.dropTarget?.id);
     if (!cell) return null;
     // "after cell N" and "before cell N+1" are the same insertion point, so both
     // must render in the same place. Anchoring to the middle of the gap makes
@@ -502,13 +344,13 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     // the gap width as the pointer crossed the midline between two tiles.
     const BAR_WIDTH = 3;
     const half = metrics.gap / 2;
-    const edge = dropTarget.side === "before" ? cell.x - half : cell.x + cell.w + half;
+    const edge = drag.dropTarget.side === "before" ? cell.x - half : cell.x + cell.w + half;
     return {
       x: Math.max(0, edge - BAR_WIDTH / 2),
       y: cell.y + 2,
       h: cell.h - 4,
     };
-  }, [dropTarget, allCells, metrics.gap]);
+  }, [drag.dropTarget, allCells, metrics.gap]);
 
   /**
    * Build a menu target from whatever the pointer landed on. The count comes
@@ -805,8 +647,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                           width={row.cardWidth}
                           height={row.h}
                           priority={row.index < EAGER_BOARD_ROWS}
-                          highlighted={hoverBoard === board.id && !blockedDrag}
-                          blocked={hoverBoard === board.id && blockedDrag}
+                          highlighted={drag.hoverBoardId === board.id && !blockedDrag}
+                          blocked={drag.hoverBoardId === board.id && blockedDrag}
                           selected={selected.has(board.id)}
                         />
                       ))}

@@ -38,9 +38,10 @@ Every clip from the Air API carries intrinsic `width` and `height`. That one fac
 
 1. `src/lib/justify.ts` computes a justified-rows layout in one O(n) pass over those dimensions. No DOM measurement, no reflow. A full relayout of all 761 items costs 0.066ms.
 2. `src/lib/useVirtualRange.ts` windows the list by binary-searching the cumulative row offsets. State updates only when the visible row range changes, so a continuous scroll triggers one re-render per row boundary crossed instead of one per frame.
-3. `src/lib/geometry.ts` hit-tests the marquee (`cellsInBox`) against the same precomputed array. `@air/react-drag-to-select` hands you a box and leaves hit-testing to you, so selection costs O(log n + k) and touches zero DOM nodes.
+3. `src/lib/useAssetDrag.ts` owns both drag gestures. Which one a press begins is decided by selection rather than by target, since a marquee can start anywhere. Movement coalesces to one evaluation per frame: raw mousemove outruns paint, and each event otherwise costs a forced hit-test plus a scan of every cell.
+4. `src/lib/geometry.ts` hit-tests the marquee (`cellsInBox`) against the same precomputed array. `@air/react-drag-to-select` hands you a box and leaves hit-testing to you, so selection costs O(log n + k) and touches zero DOM nodes.
 
-Points 2 and 3 are the same binary search over the same array.
+Points 2 and 4 are the same binary search over the same array, and point 3 hit-tests against the same geometry.
 
 ## Measured performance
 
@@ -93,7 +94,7 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 ## Beyond the brief
 
 - 110 unit tests over the pure geometry, using differential oracles: the binary searches and marquee hit-testing are checked against brute-force scans rather than fixed expectations, so a wrong oracle fails loudly. The suite caught a real bug where a stranded panorama rendered 2112px wide inside a 320px column. It is also mutation-checked: flipping the justify lookback comparison, dropping the windowing overscan, loosening rectangle edge ownership, miscounting gaps in the board grid, or swapping modifier precedence each fail a named test. All five passed silently before those tests existed.
-- GitHub Actions CI runs typecheck, lint, tests, and build. A Lighthouse workflow gates on accessibility plus two deterministic performance audits, `cumulative-layout-shift` and `dom-size`. The dom-size budget is the cheapest regression test for the virtualization: un-windowing the list would blow past it, and no unit test would notice.
+- GitHub Actions CI runs typecheck, lint, tests, and build on every push.
 - Keyboard and modifier selection: shift for ranges, cmd to toggle, cmd+A, Escape. Only marquee selection was asked for.
 - Rotation-aware dimension swapping for assets rotated 90 or 270 degrees.
 - Duplicate-id dedup across cursor page boundaries.
