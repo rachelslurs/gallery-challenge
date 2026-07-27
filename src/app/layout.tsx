@@ -6,6 +6,8 @@ const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: `Air's Gallery Challenge`,
+  description:
+    "A justified, virtualized gallery of a public Air board: 761 assets and its sub-boards, with marquee selection, drag to reorder, and drag into a board.",
 };
 
 export default function RootLayout({
@@ -26,6 +28,13 @@ export default function RootLayout({
         */}
         <link rel="preconnect" href="https://air-prod.imgix.net" />
         <link rel="dns-prefetch" href="https://air-prod.imgix.net" />
+        {/*
+          The asset list is fetched from here as soon as the client hydrates,
+          and it is a different origin from the image CDN, so it needs its own
+          handshake warmed.
+        */}
+        <link rel="preconnect" href="https://api.air.inc" />
+        <link rel="dns-prefetch" href="https://api.air.inc" />
       </head>
       <body className={inter.className}>{children}</body>
     </html>
