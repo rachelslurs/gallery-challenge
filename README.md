@@ -3,7 +3,6 @@
 A gallery view of a public Air board: 761 assets and 4 sub-boards in collapsible sections, with infinite scroll and marquee selection.
 
 Live: https://gallery-challenge-one.vercel.app
-Repo: https://github.com/rachelslurs/gallery-challenge
 
 ## Run it
 

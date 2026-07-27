@@ -28,8 +28,19 @@ export interface SelectionBarProps {
   onUndo: () => void;
 }
 
+/**
+ * One bar owns everything transient: the selection count, the undo after a
+ * move, and a refusal.
+ *
+ * The three states share a fixed skeleton rather than each laying itself out.
+ * Only the selection state has a clear button, so without a reserved slot the
+ * message would start 40px further left in the other two and the bar would
+ * appear to jump as it changed what it was saying.
+ */
 const SelectionBar = ({ count, boardTitle, moved, notice, onClear, onUndo }: SelectionBarProps) => {
   if (!notice && !moved && count === 0) return null;
+
+  const showClear = !notice && !moved && count > 0;
 
   return (
     <div className="pointer-events-none fixed inset-x-2 bottom-2 z-50">
@@ -43,32 +54,28 @@ const SelectionBar = ({ count, boardTitle, moved, notice, onClear, onUndo }: Sel
           "animate-[rise_300ms_ease-out]",
         )}
       >
-        {notice ? (
-          <span className="min-w-0 truncate text-xs text-amber-200">{notice}</span>
-        ) : moved ? (
-          <>
-            <span className="min-w-0 truncate text-xs">
-              {COPY.movedToBoard(moved.count, moved.board)}
-            </span>
-            <button type="button" onClick={onUndo} className={clsx(pillButton, "bg-white/15 hover:bg-white/25")}>
-              {COPY.undo}
+        <div className="flex min-w-0 shrink items-center gap-4">
+          {showClear ? (
+            <button type="button" onClick={onClear} className={iconButton}>
+              <span className={srOnly}>{COPY.clearSelection}</span>
+              <svg viewBox="0 0 32 32" className="block h-4 w-4 fill-current" aria-hidden>
+                <path d="M7.23 7.23a1.63 1.63 0 012.31 0L16 13.69l6.46-6.46a1.63 1.63 0 112.31 2.31L18.31 16l6.46 6.46a1.63 1.63 0 11-2.31 2.31L16 18.31l-6.46 6.46a1.63 1.63 0 11-2.31-2.31L13.69 16 7.23 9.54a1.63 1.63 0 010-2.31z" />
+              </svg>
             </button>
-          </>
-        ) : (
-          <>
-            <div className="flex min-w-0 shrink items-center gap-4">
-              <button type="button" onClick={onClear} className={iconButton}>
-                <span className={srOnly}>{COPY.clearSelection}</span>
-                <svg viewBox="0 0 32 32" className="block h-4 w-4 fill-current" aria-hidden>
-                  <path d="M7.23 7.23a1.63 1.63 0 012.31 0L16 13.69l6.46-6.46a1.63 1.63 0 112.31 2.31L18.31 16l6.46 6.46a1.63 1.63 0 11-2.31 2.31L16 18.31l-6.46 6.46a1.63 1.63 0 11-2.31-2.31L13.69 16 7.23 9.54a1.63 1.63 0 010-2.31z" />
-                </svg>
-              </button>
-              <span className="min-w-0 truncate text-xs">
-                {COPY.itemsSelectedFrom(count, boardTitle)}
-              </span>
-            </div>
+          ) : (
+            /* Holds the clear button's place so the message never shifts. */
+            <span aria-hidden className="h-6 w-6 shrink-0" />
+          )}
 
-          </>
+          <span className={clsx("min-w-0 truncate text-xs", notice && "text-amber-200")}>
+            {notice ?? (moved ? COPY.movedToBoard(moved.count, moved.board) : COPY.itemsSelectedFrom(count, boardTitle))}
+          </span>
+        </div>
+
+        {moved && !notice && (
+          <button type="button" onClick={onUndo} className={clsx(pillButton, "bg-white/15 hover:bg-white/25")}>
+            {COPY.undo}
+          </button>
         )}
       </div>
     </div>
