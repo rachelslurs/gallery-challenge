@@ -43,5 +43,10 @@ body[data-gesture="refused"] {
   threshold does not re-render every mounted tile.
 */
 [data-multiselect="true"] [data-hover-overlay] {
-  opacity: 0;
+  /*
+    !important on purpose. Tailwind's group-hover utility lands at a higher
+    specificity than this attribute pair, so without it the hover style wins and
+    the caption keeps appearing.
+  */
+  opacity: 0 !important;
 }
