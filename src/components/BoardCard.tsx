@@ -12,9 +12,10 @@ export interface BoardCardProps {
   priority: boolean;
   /** True while a drag hovers this board, so the drop destination is obvious. */
   highlighted?: boolean;
+  selected?: boolean;
 }
 
-const BoardCard = ({ board, width, height, priority, highlighted = false }: BoardCardProps) => {
+const BoardCard = ({ board, width, height, priority, highlighted = false, selected = false }: BoardCardProps) => {
   const cover = board.thumbnails?.[0];
 
   return (
@@ -27,7 +28,7 @@ const BoardCard = ({ board, width, height, priority, highlighted = false }: Boar
         className={clsx(
           "relative flex-1 overflow-hidden rounded bg-neutral-200",
           "transition-shadow duration-150",
-          highlighted
+          highlighted || selected
             ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-neutral-100"
             : "ring-1 ring-black/5 group-hover:ring-black/15",
         )}

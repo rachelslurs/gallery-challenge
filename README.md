@@ -84,6 +84,7 @@ Every number below is measured, on the deployed build, with Chrome DevTools.
 
 ## Known gaps
 
+- Boards can be selected and dropped onto, but not dragged. A mixed selection moves only its assets.
 - No auto-scroll while a marquee or reorder drag passes the viewport edge. `src/lib/autoScroll.ts` is written and tested but not wired in.
 - No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.
 - Lighthouse performance scores 89. The entire deficit is LCP: TBT is 24ms, CLS 0.001, FCP 0.77s, Speed Index 1.04s, all scoring 1.00. LCP is 3.77s and 82% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 94; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms.

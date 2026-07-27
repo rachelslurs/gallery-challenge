@@ -96,6 +96,30 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       ),
     [assetRows],
   );
+  /**
+   * Board card rects, derived from the row model the same way asset cells are.
+   * A board row knows its card width, gap and column index, so the geometry is
+   * arithmetic and the marquee can hit-test boards without measuring the DOM.
+   */
+  const boardCells = useMemo<Positioned[]>(() => {
+    const out: Positioned[] = [];
+    for (const row of rows) {
+      if (row.kind !== "boards") continue;
+      row.boards.forEach((board, column) => {
+        out.push({
+          id: board.id,
+          x: column * (row.cardWidth + metrics.gap),
+          y: row.y,
+          w: row.cardWidth,
+          h: row.h,
+        });
+      });
+    }
+    return out;
+  }, [rows, metrics.gap]);
+  const boardCellsRef = useRef(boardCells);
+  boardCellsRef.current = boardCells;
+
   const allCellsRef = useRef(allCells);
   allCellsRef.current = allCells;
   const selectedRef = useRef(selected);
@@ -148,8 +172,21 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         toContentRect(box, content.getBoundingClientRect()),
       );
 
+      // Boards are few, so a linear scan costs less than the binary search the
+      // asset wall needs.
+      const box2 = toContentRect(box, content.getBoundingClientRect());
+      const boardHits = boardCellsRef.current
+        .filter(
+          (cell) =>
+            cell.x < box2.left + box2.width &&
+            box2.left < cell.x + cell.w &&
+            cell.y < box2.top + box2.height &&
+            box2.top < cell.y + cell.h,
+        )
+        .map((cell) => cell.id);
+
       marqueeMovedRef.current = true;
-      applyMarquee(hits.map((cell) => cell.item.id));
+      applyMarquee(hits.map((cell) => cell.item.id).concat(boardHits));
     },
     [applyMarquee, contentRef],
   );
@@ -197,7 +234,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     const id = cell?.dataset.assetId;
     if (!id || !selectedRef.current.has(id)) return;
     dragRef.current = {
-      ids: Array.from(selectedRef.current),
+      // Boards can be selected but not dragged, so a mixed selection moves only
+      // its assets.
+      ids: Array.from(selectedRef.current).filter((selectedId) =>
+        assetIdsRef.current.includes(selectedId),
+      ),
       startX: event.clientX,
       startY: event.clientY,
       active: false,
@@ -372,13 +413,17 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         return;
       }
 
+      const boardEl = event.target.closest<HTMLElement>("[data-board-id]");
       const cell = event.target.closest("[data-asset-id]");
       const intent = resolveClick({
         marqueeMoved: marqueeMovedRef.current,
         // Controls inside the wall (section headers today, menu triggers next)
         // are not background, so they must not clear the selection.
         onControl: event.target.closest("button") !== null,
-        assetId: cell instanceof HTMLElement ? cell.dataset.assetId ?? null : null,
+        assetId:
+          (cell instanceof HTMLElement ? cell.dataset.assetId : undefined) ??
+          boardEl?.dataset.boardId ??
+          null,
         modifiers: {
           shiftKey: event.shiftKey,
           metaKey: event.metaKey,
@@ -549,6 +594,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                           height={row.h}
                           priority={row.index < EAGER_BOARD_ROWS}
                           highlighted={hoverBoard === board.id}
+                          selected={selected.has(board.id)}
                         />
                       ))}
                     </div>
