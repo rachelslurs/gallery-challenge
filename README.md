@@ -114,7 +114,7 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 
 ## Beyond the brief
 
-- 110 unit tests over the pure geometry, using differential oracles: the binary searches and marquee hit-testing are checked against brute-force scans rather than fixed expectations, so a wrong oracle fails loudly. The suite caught a real bug where a stranded panorama rendered 2112px wide inside a 320px column. It is also mutation-checked: flipping the justify lookback comparison, dropping the windowing overscan, loosening rectangle edge ownership, miscounting gaps in the board grid, or swapping modifier precedence each fail a named test. All five passed silently before those tests existed.
+- 118 unit tests over the layout and selection maths. Most work the answer out twice, once the quick way the app uses and once the slow obvious way, then check the two match. A mistake has to be made in both to go unnoticed. That is how the suite caught a photo 2112px wide sitting in a 320px column. I also broke the code on purpose five times, one line each, to see whether the tests noticed: they had not, so I wrote the ones that do.
 - GitHub Actions CI runs typecheck, lint, tests, and build on every push.
 - Keyboard and modifier selection: shift for ranges, cmd to toggle, cmd+A, Escape. Only marquee selection was asked for.
 - Rotation-aware dimension swapping for assets rotated 90 or 270 degrees.
