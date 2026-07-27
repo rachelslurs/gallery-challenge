@@ -1,0 +1,55 @@
+"use client";
+
+import clsx from "clsx";
+import type { Board } from "@/app/api/boards";
+import { thumbnail } from "@/lib/imgix";
+
+export interface BoardCardProps {
+  board: Board;
+  width: number;
+  height: number;
+}
+
+const BoardCard = ({ board, width, height }: BoardCardProps) => {
+  const cover = board.thumbnails?.[0];
+
+  return (
+    <div
+      data-board-id={board.id}
+      className="group flex cursor-pointer flex-col gap-2"
+      style={{ width, height }}
+    >
+      <div
+        className={clsx(
+          "relative flex-1 overflow-hidden rounded-lg bg-neutral-200/70",
+          "ring-1 ring-black/5 transition-shadow group-hover:ring-black/15",
+        )}
+      >
+        {cover ? (
+          // Same reasoning as AssetCell: imgix resizes at the edge.
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={thumbnail(cover, width)}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            draggable={false}
+            className="h-full w-full select-none object-cover"
+          />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center">
+            <svg viewBox="0 0 24 24" className="h-7 w-7 text-neutral-400" fill="currentColor" aria-hidden>
+              <path d="M3 6a2 2 0 012-2h3.6a2 2 0 011.4.6L11.8 6H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V6z" />
+            </svg>
+          </div>
+        )}
+      </div>
+
+      <p className="truncate px-0.5 text-[13px] font-medium leading-tight text-neutral-900">
+        {board.title}
+      </p>
+    </div>
+  );
+};
+
+export default BoardCard;

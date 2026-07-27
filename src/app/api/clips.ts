@@ -86,7 +86,7 @@ export const fetchAssets = ({
       "content-type": "application/json",
     },
     body: JSON.stringify({
-      limit: 24,
+      limit: 72,
       type: "all",
       withOpenDiscussionStatus: true,
       filters: {
