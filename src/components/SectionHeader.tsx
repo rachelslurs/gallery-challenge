@@ -19,7 +19,10 @@ const SectionHeader = ({ section, title, count, collapsed, onToggle }: SectionHe
     className={clsx(
       // Same radius, easing and duration as a tile, so the header reads as
       // part of the same surface rather than as unrelated chrome.
-      "flex w-full items-center gap-1.5 self-start rounded-xl px-2 py-1.5 text-left",
+      // No w-full: the parent row is a flex container, so the button sizes to
+      // its label and the hover target stops at the text rather than sweeping
+      // the whole width of the wall.
+      "inline-flex items-center gap-1.5 rounded-xl px-2 py-1.5 text-left",
       "transition-colors duration-150 hover:bg-neutral-200 active:bg-neutral-300",
       "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500",
     )}
