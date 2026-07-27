@@ -37,10 +37,9 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
     >
       <div
         className={clsx(
-          "group relative h-full w-full overflow-hidden rounded-md bg-neutral-200/70 transition-shadow",
-          selected
-            ? "ring-2 ring-blue-500 ring-offset-1 ring-offset-white"
-            : "ring-1 ring-black/5 hover:ring-black/15",
+          "group relative flex h-full w-full flex-col overflow-hidden rounded-md",
+          "transition-colors duration-150",
+          selected ? "bg-neutral-300" : "bg-neutral-200/70",
         )}
       >
         {asset.image ? (
@@ -74,7 +73,26 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           </div>
         )}
 
-        {selected && <div className="pointer-events-none absolute inset-0 bg-blue-500/15" aria-hidden />}
+        {/*
+          The ring and tint live on an overlay rather than on the container.
+          An inset box-shadow paints beneath its own content, so a ring on the
+          container is hidden by the image that fills it. A sibling declared
+          after the image is what puts the state above the photo.
+
+          The colour is set in exactly one branch: listing ring-transparent and
+          ring-blue-500 together would leave the winner to Tailwind's stylesheet
+          order rather than to this condition. The 2px is always reserved, so
+          selecting changes a colour and never nudges the layout.
+        */}
+        <div
+          aria-hidden
+          className={clsx(
+            "pointer-events-none absolute inset-0 rounded-md ring-2 ring-inset",
+            "transition-[background-color,box-shadow] duration-150",
+            selected ? "bg-blue-500/10 ring-blue-500" : "ring-transparent group-hover:bg-black/5",
+          )}
+        />
+
       </div>
     </div>
   );
