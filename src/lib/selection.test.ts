@@ -37,6 +37,15 @@ describe("resolveClick", () => {
     });
   });
 
+  // Shift and cmd are both held often enough that the precedence has to be
+  // deliberate rather than incidental to the order of the checks.
+  it("prefers extend over toggle when both modifiers are held", () => {
+    expect(resolveClick(ctx({ modifiers: { shiftKey: true, metaKey: true, ctrlKey: false } }))).toEqual({
+      kind: "extend",
+      id: "a",
+    });
+  });
+
   it("clears when the click lands on background", () => {
     expect(resolveClick(ctx({ assetId: null }))).toEqual({ kind: "clear" });
   });

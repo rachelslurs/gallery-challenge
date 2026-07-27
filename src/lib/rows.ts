@@ -1,4 +1,5 @@
 import type { Board } from "@/app/api/boards";
+import { COPY } from "./copy";
 import { justify, type Cell } from "./justify";
 import type { Asset } from "./useAssets";
 
@@ -137,7 +138,7 @@ export function buildRows({
 
   if (boards.length > 0) {
     push(
-      { kind: "header", id: "h-boards", h: headerHeight, section: "boards", title: "Boards", count: boards.length },
+      { kind: "header", id: "h-boards", h: headerHeight, section: "boards", title: COPY.boardsSection, count: boards.length },
       collapsed.boards ? sectionGap : headerGap,
     );
 
@@ -165,7 +166,7 @@ export function buildRows({
       id: "h-assets",
       h: headerHeight,
       section: "assets",
-      title: "Assets",
+      title: COPY.assetsSection,
       count: total || assets.length,
     },
     headerGap,

@@ -9,5 +9,6 @@ export const MENU_COPY = {
   copyLink: "Copy link",
   renameBoard: "Rename board",
   openBoard: "Open board",
-  menuAriaLabel: "Asset actions",
+  assetMenuLabel: "Asset actions",
+  boardMenuLabel: "Board actions",
 } as const;

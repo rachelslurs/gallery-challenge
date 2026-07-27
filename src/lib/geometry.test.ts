@@ -226,3 +226,35 @@ describe("toContentRect", () => {
     });
   });
 });
+
+describe("visibleRange overscan", () => {
+  it("widens the zero-overscan range by exactly k, clamped to the bounds", () => {
+    const rows = makeSpans(20, mulberry32(0xabc));
+    const [start, end] = visibleRange(rows, rows[8].y, 400, 0);
+    for (const k of [1, 3]) {
+      expect(visibleRange(rows, rows[8].y, 400, k)).toEqual([
+        Math.max(0, start - k),
+        Math.min(rows.length, end + k),
+      ]);
+    }
+  });
+});
+
+describe("cellsInBox edge ownership", () => {
+  /*
+   * Random float boxes never land exactly on a float cell edge, so the
+   * brute-force differential agrees with the implementation whichever way the
+   * comparison goes. Integer geometry is what pins the convention: a box that
+   * only touches an edge is outside it.
+   */
+  const grid = [{ y: 0, h: 100, cells: [{ item: "a", x: 0, y: 0, w: 100, h: 100 }] }];
+
+  it("treats a box that merely touches an edge as a miss", () => {
+    expect(cellsInBox(grid, { left: 100, top: 0, width: 50, height: 50 })).toEqual([]);
+    expect(cellsInBox(grid, { left: 0, top: 100, width: 50, height: 50 })).toEqual([]);
+  });
+
+  it("treats a box that overlaps by a pixel as a hit", () => {
+    expect(cellsInBox(grid, { left: 99, top: 0, width: 50, height: 50 })).toHaveLength(1);
+  });
+});

@@ -27,18 +27,13 @@ export const COPY = {
     `${count.toLocaleString()} ${count === 1 ? "asset" : "assets"}`,
   boardCount: (count: number): string =>
     `${count} ${count === 1 ? "board" : "boards"}`,
-  selectedCount: (count: number): string => `${count} selected`,
   assetActions: "Asset actions",
   boardActions: "Board actions",
   movedToBoard: (count: number, board: string): string =>
     `Moved ${count} ${count === 1 ? "asset" : "assets"} to ${board}`,
-  removedFromBoard: (count: number): string =>
-    `Removed ${count} ${count === 1 ? "asset" : "assets"}`,
   undo: "Undo",
   clearSelection: "Clear selection",
   boardIntoBoard: "Boards cannot be moved into another board",
-  itemsSelectedFrom: (count: number, board: string): string =>
-    `${count} ${count === 1 ? "item" : "items"} selected${board ? ` from ${board}` : ""}`,
   /**
    * Names each kind when a selection mixes them, because what the selection can
    * do then depends on which kind you mean.

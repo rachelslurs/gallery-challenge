@@ -67,7 +67,6 @@ const GalleryMenu = ({
     if (target.kind === "board") {
       return [
         { action: "open", label: MENU_COPY.openBoard },
-        { action: "rename", label: MENU_COPY.renameBoard },
         { action: "copyLink", label: MENU_COPY.copyLink },
       ];
     }
@@ -78,10 +77,6 @@ const GalleryMenu = ({
       {
         action: "download",
         label: many ? MENU_COPY.downloadMany(count) : MENU_COPY.downloadOne,
-      },
-      {
-        action: "move",
-        label: many ? MENU_COPY.moveMany(count) : MENU_COPY.moveOne,
       },
       { action: "copyLink", label: MENU_COPY.copyLink },
       {
@@ -185,7 +180,13 @@ const GalleryMenu = ({
   useEffect(() => {
     if (target === null) return;
     const handleKeyDown = (event: KeyboardEvent): void => {
-      if (event.key === "Escape") onClose();
+      // The document listener runs before the window listener the gallery uses
+      // for Escape, so stopping here keeps dismissing the menu from also
+      // discarding the selection it was acting on.
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
     };
     const handlePointerDown = (event: PointerEvent): void => {
       const menu = menuRef.current;
@@ -217,7 +218,7 @@ const GalleryMenu = ({
     <div
       ref={menuRef}
       role="menu"
-      aria-label={MENU_COPY.menuAriaLabel}
+      aria-label={target.kind === "board" ? MENU_COPY.boardMenuLabel : MENU_COPY.assetMenuLabel}
       className="fixed z-50 min-w-[200px] rounded-lg border border-neutral-200 bg-white py-1 shadow-lg shadow-black/10"
       style={{ left: target.x, top: target.y }}
       onKeyDown={handleMenuKeyDown}

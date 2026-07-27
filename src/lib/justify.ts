@@ -130,9 +130,3 @@ export function justify<T extends Sized>(
   return rows;
 }
 
-/** Total scrollable height of a row list, ignoring the trailing gap. */
-export function rowsHeight<T>(rows: readonly JustifiedRow<T>[], gap: number): number {
-  if (rows.length === 0) return 0;
-  const last = rows[rows.length - 1];
-  return last.y + last.h + gap;
-}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { justify, rowsHeight, type JustifiedRow, type JustifyOptions, type Sized } from "./justify";
+import { justify, type JustifiedRow, type JustifyOptions, type Sized } from "./justify";
 
 /** Deterministic PRNG (mulberry32) so failures reproduce byte for byte. */
 const mulberry32 = (seed: number): (() => number) => {
@@ -117,11 +117,6 @@ describe.each(fixtures)("justify at $label", ({ items, opts, rows }) => {
       expect(rows[i].y).toBeCloseTo(prev.y + prev.h + gap, 6);
     }
   });
-
-  it("reports rowsHeight as the last row's bottom edge plus the gap", () => {
-    const last = rows[rows.length - 1];
-    expect(rowsHeight(rows, gap)).toBeCloseTo(last.y + last.h + gap, 6);
-  });
 });
 
 describe("justify degenerate inputs", () => {
@@ -164,8 +159,27 @@ describe("justify degenerate inputs", () => {
       expect(rows[0].h).toBeGreaterThan(0);
     }
   });
+});
 
-  it("rowsHeight of an empty list is 0", () => {
-    expect(rowsHeight([], 8)).toBe(0);
+describe("justify lookback", () => {
+  const opts = { containerWidth: 600, targetHeight: 100, gap: 0, maxHeight: 200 };
+  const item = (aspect: number) => ({ width: aspect * 100, height: 100 });
+
+  /*
+   * Which items share a row is the algorithm's entire job, and every other test
+   * here pins invariants that hold for any grouping. Flipping the lookback
+   * comparison changes the layout completely without failing them.
+   */
+  it("keeps whichever candidate row lands closer to the target height", () => {
+    // Taking the third item gives 600/7 = 86; leaving it gives 600/4 = 150.
+    expect(justify([item(2), item(2), item(3)], opts)[0].cells.length).toBe(3);
+    // Taking the panorama gives 600/13.5 = 44; leaving it gives 600/5.5 = 109.
+    expect(justify([item(5.5), item(8)], opts)[0].cells.length).toBe(1);
+  });
+
+  it("respects the ceiling even when excluding the item would land closer", () => {
+    const tight = { ...opts, maxHeight: 105 };
+    // Excluding would fit at 109, above the ceiling, so the item is taken.
+    expect(justify([item(5.5), item(8)], tight)[0].cells.length).toBe(2);
   });
 });

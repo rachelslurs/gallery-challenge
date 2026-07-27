@@ -214,3 +214,25 @@ describe("board grid", () => {
     }
   });
 });
+
+describe("board card sizing", () => {
+  it("cards plus their gaps fill the container exactly", () => {
+    const input = baseInput();
+    const row = buildRows(input).rows.find((r) => r.kind === "boards");
+    if (row?.kind !== "boards") throw new Error("expected a board row");
+    const columns = input.metrics.boardColumns;
+    expect(columns * row.cardWidth + (columns - 1) * input.metrics.boardGap).toBeCloseTo(
+      input.containerWidth,
+      6,
+    );
+  });
+
+  it("reports the server total in the assets header, falling back to what is loaded", () => {
+    const header = (input: Partial<BuildRowsInput>) =>
+      buildRows(baseInput(input)).rows.find((r) => r.kind === "header" && r.id === "h-assets");
+    const withTotal = header({ total: 500 });
+    const withoutTotal = header({ total: 0 });
+    expect(withTotal?.kind === "header" && withTotal.count).toBe(500);
+    expect(withoutTotal?.kind === "header" && withoutTotal.count).toBe(60);
+  });
+});

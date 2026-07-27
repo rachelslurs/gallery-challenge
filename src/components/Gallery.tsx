@@ -88,6 +88,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // A marquee ends with a mouseup that also fires a click. Without this the
   // background click handler would immediately clear what was just selected.
   const marqueeMovedRef = useRef(false);
+  const menuOpenRef = useRef(false);
 
   /** Flat geometry for hit-testing a single point, as reorder.ts expects. */
   const allCells = useMemo<Positioned[]>(
@@ -139,6 +140,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const hoverBoardRef = useRef<string | null>(null);
   const [hoverBoard, setHoverBoard] = useState<string | null>(null);
+  const [dragKind, setDragKind] = useState<"assets" | "board" | null>(null);
   // Snapshot for undo. There is no write endpoint, so a move is a local
   // filter and reversing it means restoring the previous array wholesale.
   const undoRef = useRef<Asset[] | null>(null);
@@ -175,21 +177,18 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       // getBoundingClientRect is live, so the element's own offset already
       // reflects scroll position. The box arrives in viewport coordinates.
-      const hits = cellsInBox(
-        assetRowsRef.current,
-        toContentRect(box, content.getBoundingClientRect()),
-      );
+      const contentBox = toContentRect(box, content.getBoundingClientRect());
+      const hits = cellsInBox(assetRowsRef.current, contentBox);
 
       // Boards are few, so a linear scan costs less than the binary search the
       // asset wall needs.
-      const box2 = toContentRect(box, content.getBoundingClientRect());
       const boardHits = boardCellsRef.current
         .filter(
           (cell) =>
-            cell.x < box2.left + box2.width &&
-            box2.left < cell.x + cell.w &&
-            cell.y < box2.top + box2.height &&
-            box2.top < cell.y + cell.h,
+            cell.x < contentBox.left + contentBox.width &&
+            contentBox.left < cell.x + cell.w &&
+            cell.y < contentBox.top + contentBox.height &&
+            contentBox.top < cell.y + cell.h,
         )
         .map((cell) => cell.id);
 
@@ -234,6 +233,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const handleMouseDown = useCallback((event: MouseEvent<HTMLDivElement>): void => {
     marqueeMovedRef.current = false;
 
+    // Secondary buttons open the context menu. Without this they also armed a
+    // drag, so a right-drag committed a reorder behind the open menu.
+    if (event.button !== 0) {
+      dragRef.current = null;
+      setDragKind(null);
+      return;
+    }
+
     // Pressing a selected tile arms a drag. It only becomes one after the
     // pointer travels far enough, so a plain click still selects.
     if (!(event.target instanceof Element)) return;
@@ -244,12 +251,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       // Armed only so the gesture can be refused visibly. Silently doing
       // nothing reads as broken rather than disallowed.
       dragRef.current = { ids: [], startX: event.clientX, startY: event.clientY, active: false, kind: "board" };
+      setDragKind("board");
       return;
     }
 
     const cell = event.target.closest<HTMLElement>("[data-asset-id]");
     const id = cell?.dataset.assetId;
     if (!id || !selectedRef.current.has(id)) return;
+    setDragKind("assets");
     dragRef.current = {
       kind: "assets",
       // Boards can be selected but not dragged, so a mixed selection moves only
@@ -277,6 +286,18 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       const drag = dragRef.current;
       const content = contentRef.current;
       if (!drag || !content) return;
+
+      // The button was released somewhere this window never saw. Abandon the
+      // gesture rather than letting plain movement resume it.
+      if ((event.buttons & 1) === 0) {
+        dragRef.current = null;
+        dropTargetRef.current = null;
+        hoverBoardRef.current = null;
+        setDragKind(null);
+        setDropTarget(null);
+        setHoverBoard(null);
+        return;
+      }
 
       if (!drag.active) {
         const travelled = Math.hypot(event.clientX - drag.startX, event.clientY - drag.startY);
@@ -333,6 +354,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       dragRef.current = null;
       dropTargetRef.current = null;
       hoverBoardRef.current = null;
+      setDragKind(null);
       setDropTarget(null);
       setHoverBoard(null);
       if (!drag?.active) return;
@@ -384,7 +406,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
-  const blockedDrag = dragRef.current?.kind === "board";
+  const blockedDrag = dragKind === "board";
   // Boards live in the same selection set, so the split has to be derived.
   const selectedAssetCount = useMemo(
     () => assetIds.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0),
@@ -505,6 +527,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     [targetFrom, selected, selectOnly],
   );
 
+  const closeMenu = useCallback((): void => setMenuTarget(null), []);
+
   const handleMenuAction = useCallback(
     (action: MenuAction, target: MenuTarget): void => {
       if (action !== "remove" || target.kind !== "asset") return;
@@ -535,7 +559,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent): void => {
+      // The menu owns Escape while it is open, so dismissing it does not also
+      // discard the selection it was acting on.
       if (event.key === "Escape") {
+        if (menuOpenRef.current) return;
         clear();
         return;
       }
@@ -547,6 +574,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [clear, selectAll]);
+
+  menuOpenRef.current = menuTarget !== null;
 
   const visible = rows.slice(range[0], range[1]);
 
@@ -575,7 +604,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       <GalleryMenu
         target={menuTarget}
-        onClose={() => setMenuTarget(null)}
+        onClose={closeMenu}
         onAction={handleMenuAction}
       />
 

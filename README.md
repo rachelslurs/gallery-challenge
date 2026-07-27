@@ -91,7 +91,7 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 
 ## Beyond the brief
 
-- 104 unit tests over the pure geometry, using differential oracles: the binary searches and marquee hit-testing are checked against brute-force scans rather than fixed expectations, so a wrong oracle fails loudly. The suite caught a real bug where a stranded panorama rendered 2112px wide inside a 320px column.
+- 110 unit tests over the pure geometry, using differential oracles: the binary searches and marquee hit-testing are checked against brute-force scans rather than fixed expectations, so a wrong oracle fails loudly. The suite caught a real bug where a stranded panorama rendered 2112px wide inside a 320px column. It is also mutation-checked: flipping the justify lookback comparison, dropping the windowing overscan, loosening rectangle edge ownership, miscounting gaps in the board grid, or swapping modifier precedence each fail a named test. All five passed silently before those tests existed.
 - GitHub Actions CI runs typecheck, lint, tests, and build. A Lighthouse workflow gates on accessibility plus two deterministic performance audits, `cumulative-layout-shift` and `dom-size`. The dom-size budget is the cheapest regression test for the virtualization: un-windowing the list would blow past it, and no unit test would notice.
 - Keyboard and modifier selection: shift for ranges, cmd to toggle, cmd+A, Escape. Only marquee selection was asked for.
 - Rotation-aware dimension swapping for assets rotated 90 or 270 degrees.

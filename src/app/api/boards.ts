@@ -46,4 +46,9 @@ export const fetchBoards = (): Promise<BoardsListResponse> =>
         name: "dateModified",
       },
     }),
-  }).then((r) => r.json());
+  }).then((response) => {
+    // A non-2xx with a JSON body would otherwise resolve as success, and the
+    // gallery would report the end of the list instead of a failure.
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json() as Promise<BoardsListResponse>;
+  });
