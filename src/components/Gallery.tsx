@@ -250,7 +250,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       <DragSelection />
 
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-x-hidden overflow-y-auto">
-        <div className="px-3 py-3 sm:px-6 sm:py-4">
+        {/* Cells inset their images by 4px, so this padding lands the outer
+            image edge at 12px on mobile and 28px above it, matching the
+            reference gallery's gutters. */}
+        <div className="px-2 py-2 sm:px-6 sm:py-4">
           <div
             ref={contentRef}
             onClick={handleClick}
@@ -266,7 +269,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                   return (
                     <div
                       key={row.id}
-                      className="absolute left-0 right-0"
+                      className="absolute left-0 right-0 flex items-center"
                       style={{ transform: `translate3d(0, ${row.y}px, 0)`, height: row.h }}
                     >
                       <SectionHeader

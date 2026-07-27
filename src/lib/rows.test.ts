@@ -170,7 +170,15 @@ describe("metricsFor", () => {
     for (const width of [320, 768, 1440]) {
       const metrics = metricsFor(width);
       expect(metrics.maxHeight).toBeGreaterThanOrEqual(metrics.targetHeight);
-      expect(metrics.gap).toBeGreaterThan(0);
+    }
+  });
+
+  // A zero gap is legitimate: each cell insets its image by 4px on every side,
+  // so adjacent images are still 8px apart with no gap between the cells. What
+  // must never happen is a negative gap, which would overlap the layout.
+  it("never returns a negative gap", () => {
+    for (const width of [0, 1, 319, 320, 479, 480, 767, 768, 1279, 1280, 1440, 5000]) {
+      expect(metricsFor(width).gap).toBeGreaterThanOrEqual(0);
     }
   });
 });

@@ -32,19 +32,32 @@ export interface Metrics {
  * a phone still shows several rows at once instead of one image per screenful.
  */
 export function metricsFor(width: number): Metrics {
+  // Row height stays near 240 at every width rather than shrinking on small
+  // screens, which is what the reference gallery does: a narrow viewport gets
+  // fewer images per row, not smaller ones. Measured there at 247 / 226 / 244
+  // for 1440 / 768 / 390.
+  //
   // `gap` is the distance between cells. Each cell insets its image by 4px on
-  // every side (see AssetCell), so the visible gap between two images is the
-  // gap plus 8. Desktop therefore reads as 16px between images.
+  // every side (see AssetCell), so the visible gap between two images is this
+  // value plus 8: 16px from 480 up, 8px below it.
+  //
+  // maxHeight sits close to the target so rows stay visually even. The
+  // reference varies by roughly a quarter either side of its target.
+  // `targetHeight` is an input to the greedy fill, not the height rows come out
+  // at. A row closes as soon as it overflows, so the fitted height is always at
+  // or below the target and the median lands roughly 20% under it. These values
+  // are therefore set about a quarter above the ~240px the reference gallery
+  // actually renders.
   if (width < 480) {
-    return { targetHeight: 132, maxHeight: 190, gap: 2, boardColumns: 2, headerHeight: 48 };
+    return { targetHeight: 230, maxHeight: 290, gap: 0, boardColumns: 2, headerHeight: 48 };
   }
   if (width < 768) {
-    return { targetHeight: 168, maxHeight: 240, gap: 4, boardColumns: 3, headerHeight: 52 };
+    return { targetHeight: 240, maxHeight: 300, gap: 8, boardColumns: 3, headerHeight: 52 };
   }
   if (width < 1280) {
-    return { targetHeight: 208, maxHeight: 300, gap: 6, boardColumns: 4, headerHeight: 56 };
+    return { targetHeight: 255, maxHeight: 320, gap: 8, boardColumns: 4, headerHeight: 56 };
   }
-  return { targetHeight: 248, maxHeight: 360, gap: 8, boardColumns: 5, headerHeight: 56 };
+  return { targetHeight: 260, maxHeight: 325, gap: 8, boardColumns: 5, headerHeight: 56 };
 }
 
 /** Board cards are a uniform grid: a 4:3 thumbnail plus a fixed label strip. */
