@@ -13,9 +13,11 @@ export interface BoardCardProps {
   /** True while a drag hovers this board, so the drop destination is obvious. */
   highlighted?: boolean;
   selected?: boolean;
+  /** True when a drag is hovering here but cannot be dropped. */
+  blocked?: boolean;
 }
 
-const BoardCard = ({ board, width, height, priority, highlighted = false, selected = false }: BoardCardProps) => {
+const BoardCard = ({ board, width, height, priority, highlighted = false, selected = false, blocked = false }: BoardCardProps) => {
   const cover = board.thumbnails?.[0];
 
   return (
@@ -28,9 +30,11 @@ const BoardCard = ({ board, width, height, priority, highlighted = false, select
         className={clsx(
           "relative flex-1 overflow-hidden rounded bg-neutral-200",
           "transition-shadow duration-150",
-          highlighted || selected
-            ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-neutral-100"
-            : "ring-1 ring-black/5 group-hover:ring-black/15",
+          blocked
+            ? "ring-2 ring-red-500 ring-offset-2 ring-offset-neutral-100"
+            : highlighted || selected
+              ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-neutral-100"
+              : "ring-1 ring-black/5 group-hover:ring-black/15",
         )}
       >
         {cover ? (

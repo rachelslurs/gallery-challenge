@@ -24,6 +24,7 @@ export const COPY = {
     `Removed ${count} ${count === 1 ? "asset" : "assets"}`,
   undo: "Undo",
   clearSelection: "Clear selection",
+  boardIntoBoard: "Boards cannot be moved into another board",
   itemsSelectedFrom: (count: number, board: string): string =>
     `${count} ${count === 1 ? "item" : "items"} selected${board ? ` from ${board}` : ""}`,
 } as const;

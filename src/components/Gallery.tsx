@@ -127,7 +127,13 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const assetIdsRef = useRef(assetIds);
   assetIdsRef.current = assetIds;
 
-  const dragRef = useRef<{ ids: string[]; startX: number; startY: number; active: boolean } | null>(null);
+  const dragRef = useRef<{
+    kind: "assets" | "board";
+    ids: string[];
+    startX: number;
+    startY: number;
+    active: boolean;
+  } | null>(null);
   const dropTargetRef = useRef<DropTarget | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
   const hoverBoardRef = useRef<string | null>(null);
@@ -136,6 +142,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // filter and reversing it means restoring the previous array wholesale.
   const undoRef = useRef<Asset[] | null>(null);
   const [moved, setMoved] = useState<{ count: number; board: string } | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const shouldStartSelecting = useCallback(
     (target: EventTarget | null): boolean => {
@@ -230,10 +237,20 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     // pointer travels far enough, so a plain click still selects.
     if (!(event.target instanceof Element)) return;
     if (event.target.closest("[data-menu-trigger]")) return;
+    const boardEl = event.target.closest<HTMLElement>("[data-board-id]");
+    const boardId = boardEl?.dataset.boardId;
+    if (boardId && selectedRef.current.has(boardId)) {
+      // Armed only so the gesture can be refused visibly. Silently doing
+      // nothing reads as broken rather than disallowed.
+      dragRef.current = { ids: [], startX: event.clientX, startY: event.clientY, active: false, kind: "board" };
+      return;
+    }
+
     const cell = event.target.closest<HTMLElement>("[data-asset-id]");
     const id = cell?.dataset.assetId;
     if (!id || !selectedRef.current.has(id)) return;
     dragRef.current = {
+      kind: "assets",
       // Boards can be selected but not dragged, so a mixed selection moves only
       // its assets.
       ids: Array.from(selectedRef.current).filter((selectedId) =>
@@ -268,6 +285,18 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       // A board under the pointer takes precedence: dropping onto one moves the
       // assets there, so an insertion point would be misleading.
+      if (drag.kind === "board") {
+        const overBoard = document
+          .elementFromPoint(event.clientX, event.clientY)
+          ?.closest<HTMLElement>("[data-board-id]");
+        const id = overBoard?.dataset.boardId ?? null;
+        if (id !== hoverBoardRef.current) {
+          hoverBoardRef.current = id;
+          setHoverBoard(id);
+        }
+        return;
+      }
+
       const under = document.elementFromPoint(event.clientX, event.clientY);
       const boardEl = under?.closest<HTMLElement>("[data-board-id]") ?? null;
       const boardId = boardEl?.dataset.boardId ?? null;
@@ -307,6 +336,12 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       setHoverBoard(null);
       if (!drag?.active) return;
 
+      if (drag.kind === "board") {
+        if (boardId) setNotice(COPY.boardIntoBoard);
+        marqueeMovedRef.current = true;
+        return;
+      }
+
       if (boardId) {
         const moving = new Set(drag.ids);
         setAssets((previous) => {
@@ -341,6 +376,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       window.removeEventListener("mouseup", onUp);
     };
   }, [contentRef, setAssets, clear, boardTitleById]);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = window.setTimeout(() => setNotice(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  const blockedDrag = dragRef.current?.kind === "board";
 
   const dropIndicator = useMemo(() => {
     if (!dropTarget) return null;
@@ -593,7 +636,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                           width={row.cardWidth}
                           height={row.h}
                           priority={row.index < EAGER_BOARD_ROWS}
-                          highlighted={hoverBoard === board.id}
+                          highlighted={hoverBoard === board.id && !blockedDrag}
+                          blocked={hoverBoard === board.id && blockedDrag}
                           selected={selected.has(board.id)}
                         />
                       ))}
@@ -636,6 +680,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       </div>
 
       <SelectionBar
+        notice={notice}
         count={count}
         boardTitle={boardTitle}
         moved={moved}

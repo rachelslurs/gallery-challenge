@@ -22,12 +22,14 @@ export interface SelectionBarProps {
   boardTitle: string;
   /** Set while a move can still be undone; takes over the bar. */
   moved: { count: number; board: string } | null;
+  /** A refusal to explain, which outranks everything else the bar could say. */
+  notice: string | null;
   onClear: () => void;
   onUndo: () => void;
 }
 
-const SelectionBar = ({ count, boardTitle, moved, onClear, onUndo }: SelectionBarProps) => {
-  if (!moved && count === 0) return null;
+const SelectionBar = ({ count, boardTitle, moved, notice, onClear, onUndo }: SelectionBarProps) => {
+  if (!notice && !moved && count === 0) return null;
 
   return (
     <div className="pointer-events-none fixed inset-x-2 bottom-2 z-50">
@@ -41,7 +43,9 @@ const SelectionBar = ({ count, boardTitle, moved, onClear, onUndo }: SelectionBa
           "animate-[rise_300ms_ease-out]",
         )}
       >
-        {moved ? (
+        {notice ? (
+          <span className="min-w-0 truncate text-xs text-amber-200">{notice}</span>
+        ) : moved ? (
           <>
             <span className="min-w-0 truncate text-xs">
               {COPY.movedToBoard(moved.count, moved.board)}
