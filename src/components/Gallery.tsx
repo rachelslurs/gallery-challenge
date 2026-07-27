@@ -12,6 +12,7 @@ import { useSelection } from "@/lib/useSelection";
 import { useContainerWidth, useVirtualRange } from "@/lib/useVirtualRange";
 import AssetCell from "./AssetCell";
 import BoardCard from "./BoardCard";
+import GalleryMenu, { type MenuAction, type MenuTarget } from "./GalleryMenu";
 import SectionHeader from "./SectionHeader";
 
 const OVERSCAN = 3;
@@ -44,8 +45,9 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     assets: false,
   });
   const [marqueeEnabled, setMarqueeEnabled] = useState(true);
+  const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
 
-  const { assets, total, hasMore, loading, error, loadMore, retry } = useAssets();
+  const { assets, total, hasMore, loading, error, loadMore, retry, setAssets } = useAssets();
   const { ref: contentRef, width } = useContainerWidth<HTMLDivElement>();
 
   const assetIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
@@ -154,11 +156,58 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     marqueeMovedRef.current = false;
   }, []);
 
+  /**
+   * Build a menu target from whatever the pointer landed on. The count comes
+   * from the live selection only when the target is part of it, so
+   * right-clicking outside a selection acts on that one item, which is what
+   * every file manager does.
+   */
+  const targetFrom = useCallback(
+    (element: Element, x: number, y: number): MenuTarget | null => {
+      const assetEl = element.closest<HTMLElement>("[data-asset-id]");
+      if (assetEl?.dataset.assetId) {
+        const id = assetEl.dataset.assetId;
+        const inSelection = selected.has(id);
+        return {
+          kind: "asset",
+          id,
+          title: assetEl.querySelector("img")?.alt ?? "",
+          x,
+          y,
+          selectionCount: inSelection ? count : 1,
+        };
+      }
+      const boardEl = element.closest<HTMLElement>("[data-board-id]");
+      if (boardEl?.dataset.boardId) {
+        return {
+          kind: "board",
+          id: boardEl.dataset.boardId,
+          title: boardEl.textContent?.trim() ?? "",
+          x,
+          y,
+          selectionCount: 1,
+        };
+      }
+      return null;
+    },
+    [selected, count],
+  );
+
   // One delegated handler rather than a callback prop on each of 761 cells,
   // which would defeat their memoization.
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>): void => {
       if (!(event.target instanceof Element)) return;
+
+      // The ellipsis opens the same menu the right-click does, anchored to the
+      // button so it appears where the user is looking.
+      const trigger = event.target.closest("[data-menu-trigger]");
+      if (trigger) {
+        const rect = trigger.getBoundingClientRect();
+        const target = targetFrom(trigger, rect.right, rect.bottom + 4);
+        if (target) setMenuTarget(target);
+        return;
+      }
 
       const cell = event.target.closest("[data-asset-id]");
       const intent = resolveClick({
@@ -181,7 +230,34 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       else if (intent.kind === "toggle") toggle(intent.id);
       else selectOnly(intent.id);
     },
-    [clear, extendTo, toggle, selectOnly],
+    [clear, extendTo, toggle, selectOnly, targetFrom],
+  );
+
+
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>): void => {
+      if (!(event.target instanceof Element)) return;
+      const target = targetFrom(event.target, event.clientX, event.clientY);
+      if (!target) return;
+      event.preventDefault();
+      // Right-clicking outside the current selection reduces it to that item,
+      // so the menu's count and what it acts on can never disagree.
+      if (target.kind === "asset" && !selected.has(target.id)) selectOnly(target.id);
+      setMenuTarget(target);
+    },
+    [targetFrom, selected, selectOnly],
+  );
+
+  const handleMenuAction = useCallback(
+    (action: MenuAction, target: MenuTarget): void => {
+      if (action !== "remove" || target.kind !== "asset") return;
+      // No write endpoint exists on this API, so removal is local by necessity.
+      const ids = target.selectionCount > 1 ? Array.from(selected) : [target.id];
+      const removing = new Set(ids);
+      setAssets((previous) => previous.filter((asset) => !removing.has(asset.id)));
+      clear();
+    },
+    [selected, setAssets, clear],
   );
 
   // Depends on `rows.length` as well as the visible range: a scroll that stops
@@ -249,6 +325,12 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       */}
       <DragSelection />
 
+      <GalleryMenu
+        target={menuTarget}
+        onClose={() => setMenuTarget(null)}
+        onAction={handleMenuAction}
+      />
+
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-x-hidden overflow-y-auto">
         {/* Cells inset their images by 4px, so this padding lands the outer
             image edge at 12px on mobile and 28px above it, matching the
@@ -258,6 +340,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
             ref={contentRef}
             onClick={handleClick}
             onMouseDown={handleMouseDown}
+            onContextMenu={handleContextMenu}
             className="relative w-full select-none"
             style={{ height }}
           >

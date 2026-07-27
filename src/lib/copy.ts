@@ -16,6 +16,13 @@ export const COPY = {
   boardCount: (count: number): string =>
     `${count} ${count === 1 ? "board" : "boards"}`,
   selectedCount: (count: number): string => `${count} selected`,
+  assetActions: "Asset actions",
+  boardActions: "Board actions",
+  movedToBoard: (count: number, board: string): string =>
+    `Moved ${count} ${count === 1 ? "asset" : "assets"} to ${board}`,
+  removedFromBoard: (count: number): string =>
+    `Removed ${count} ${count === 1 ? "asset" : "assets"}`,
+  undo: "Undo",
 } as const;
 
 /** Context strings for `messageFrom`, so error text reads consistently. */

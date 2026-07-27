@@ -91,6 +91,30 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
             selected ? "bg-blue-500/10" : "group-hover:bg-black/5",
           )}
         />
+
+        {/*
+          Marked with a data attribute rather than given an onClick, so the one
+          delegated listener on the wall handles it and the cell keeps taking no
+          callback props. A callback would change identity per render and defeat
+          the memo across all 761 cells.
+        */}
+        <button
+          type="button"
+          data-menu-trigger="asset"
+          aria-label={COPY.assetActions}
+          className={clsx(
+            "absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-md",
+            "bg-white/90 text-neutral-700 shadow-sm backdrop-blur",
+            "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
+            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+          )}
+        >
+          <svg viewBox="0 0 16 16" className="pointer-events-none h-4 w-4 fill-current" aria-hidden>
+            <circle cx="3.5" cy="8" r="1.4" />
+            <circle cx="8" cy="8" r="1.4" />
+            <circle cx="12.5" cy="8" r="1.4" />
+          </svg>
+        </button>
       </div>
 
       {/*
