@@ -304,12 +304,19 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     if (!dropTarget) return null;
     const cell = allCells.find((c) => c.id === dropTarget.id);
     if (!cell) return null;
+    // "after cell N" and "before cell N+1" are the same insertion point, so both
+    // must render in the same place. Anchoring to the middle of the gap makes
+    // them coincide; offsetting from each cell's own edge made the bar jump by
+    // the gap width as the pointer crossed the midline between two tiles.
+    const BAR_WIDTH = 3;
+    const half = metrics.gap / 2;
+    const edge = dropTarget.side === "before" ? cell.x - half : cell.x + cell.w + half;
     return {
-      x: dropTarget.side === "before" ? cell.x - 3 : cell.x + cell.w + 1,
+      x: Math.max(0, edge - BAR_WIDTH / 2),
       y: cell.y + 2,
       h: cell.h - 4,
     };
-  }, [dropTarget, allCells]);
+  }, [dropTarget, allCells, metrics.gap]);
 
   /**
    * Build a menu target from whatever the pointer landed on. The count comes

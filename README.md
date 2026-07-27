@@ -10,7 +10,7 @@ Repo: https://github.com/rachelslurs/gallery-challenge
 ```bash
 npm install
 npm run dev    # http://localhost:3000
-npm test       # 84 tests, ~400ms
+npm test       # 113 tests, ~400ms
 ```
 
 ## Requirements status
@@ -20,11 +20,17 @@ npm test       # 84 tests, ~400ms
 | Match or improve the design | Done |
 | Fetch boards and assets, collapsible sections, infinite scroll | Done |
 | Marquee selection | Done, via `@air/react-drag-to-select` |
-| Drag to reorder | Not built |
-| Drag assets into a sub-board | Not built |
-| Ellipsis buttons and context menus | Built but not wired in: `src/components/GalleryMenu.tsx` exists and `Gallery.tsx` never imports it |
+| Drag to reorder | Done |
+| Drag assets into a sub-board | Done, local only: the API has no write endpoint |
+| Ellipsis buttons and context menus | Done, both reflect the selection count |
 
-Reordering and the menus are the casualties of the four-hour limit. I spent that time on the layout and selection engine instead.
+All seven landed. Reordering and moving are local: the endpoints are read-only, so
+there is nothing to persist to.
+
+Both drag gestures are told apart by selection. Pressing an already-selected tile
+moves it; pressing anything else draws a marquee. A marquee can start anywhere,
+including on top of an image, which is how the reference gallery behaves, so a card
+cannot also own pointer-down.
 
 ## Architecture
 
@@ -78,6 +84,8 @@ Every number below is measured, on the deployed build, with Chrome DevTools.
 
 ## Known gaps
 
-- No auto-scroll while a marquee drag passes the viewport edge. `src/lib/autoScroll.ts` exists and is tested but is not wired in.
+- No auto-scroll while a marquee or reorder drag passes the viewport edge. `src/lib/autoScroll.ts` is written and tested but not wired in.
+- No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.
+- Lighthouse performance scores 89. The entire deficit is LCP: TBT is 24ms, CLS 0.001, FCP 0.77s, Speed Index 1.04s, all scoring 1.00. LCP is 3.77s and 82% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 94; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms.
 - Boards are not marquee-selectable; only assets are.
 - The prerendered HTML contains no `<img>` tags, because the wall is virtualized and the visible range is empty without a scroll container. Air's own app has the same property: I checked, and its initial HTML contains one img, a workspace logo.
