@@ -45,8 +45,21 @@ Points 2 and 4 are the same binary search over the same array, and point 3 hit-t
 
 ## Measured performance
 
-Taken with Chrome DevTools against a local production build, with all 761
-assets loaded.
+### How these were taken
+
+Chrome DevTools driven over the DevTools MCP, against a **production build**
+(`npm run build && npm start`), never the dev server. The distinction matters: the same page measured 1028ms LCP under `next dev` and 332ms built,
+because dev ships an unminified React development build with HMR attached and
+re-runs the server render on every request. Its TTFB was 589ms against 2-3ms
+built. Numbers taken from `next dev` would describe the dev harness.
+
+CPU throttled 6x through the CDP, matching the stated grading condition. All
+761 assets were loaded before measuring, so the wall is at full size rather
+than one page deep. Frame gaps come from timing successive
+`requestAnimationFrame` callbacks during a scripted scroll or marquee, reported
+as a median and a count over 32ms rather than an average, since a mean hides
+exactly the stalls that get noticed. The relayout cost is a Node benchmark of
+`justify` over 761 items, averaged across 200 runs.
 
 | Measurement | Result |
 | --- | --- |
