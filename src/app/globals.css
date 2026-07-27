@@ -35,3 +35,13 @@ body[data-gesture="drop"] {
 body[data-gesture="refused"] {
   cursor: not-allowed;
 }
+
+/*
+  Once a group is selected, per-tile filename and specifications stop being
+  information and start being noise that follows the pointer across the wall.
+  Driven by an attribute on the wall rather than a prop, so crossing the
+  threshold does not re-render every mounted tile.
+*/
+[data-multiselect="true"] [data-hover-overlay] {
+  opacity: 0;
+}

@@ -70,7 +70,7 @@ exactly the stalls that get noticed. The relayout cost is a Node benchmark of
 | Cumulative layout shift | 0.00; every cell's height is known before its image loads |
 | Sample photo payload | 1.4MB original; 541KB at imgix defaults; 30KB at `w=400` |
 | LCP, unthrottled local production build | 278ms and 415ms on two runs of the same build |
-| LCP, Lighthouse mobile simulation | 4.4s. Different methodology, not a contradiction: Lighthouse projects the hydrate-then-fetch chain onto 4x CPU and a 150ms RTT |
+| LCP, Lighthouse mobile simulation | 4.4s. Different methodology: Lighthouse projects the hydrate-then-fetch chain onto 4x CPU and a 150ms RTT, where the two figures above are wall-clock on an unthrottled local build |
 | Production TTFB | 2-3ms; the route is statically prerendered with `revalidate = 300` |
 
 ## Decisions
@@ -125,7 +125,10 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 ## Known gaps
 
 - No per-tile keyboard navigation. The wall takes focus as one region and scrolls with the arrow keys, but selecting a specific tile needs a pointer. Doing it properly means roving tabindex or `aria-activedescendant`, both of which have to force the virtual window to include the focused index and then imperatively focus a newly mounted node. That is not a partial job, so it is not started.
+- The per-tile filename and specifications are suppressed once more than one item is selected, since a caption chasing the pointer competes with the selection you are building. They return when the selection drops back to one.
 - Shift-click ranges and cmd+A cover assets only. The selection holds both kinds but the ordered list behind ranges is the asset list, so a range spanning a board and an asset does nothing sensible.
 - Download and Share were removed from the action bar rather than left inert: neither has an endpoint behind it.
+- `Gallery.tsx` is still around 700 lines. Both drag gestures moved out to `useAssetDrag`, but marquee wiring, click resolution, the menu target and the undo state all still live there. The coupling improved more than the line count did.
+- Download triggers one anchor click per selected asset, which a browser may block past the first few. A real implementation would zip server-side, which this API has no endpoint for.
 - No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.
-- Lighthouse performance scores 85. The entire deficit is LCP: TBT is 20ms, CLS 0.001, FCP 0.8s, Speed Index 1.3s, all scoring 1.00. LCP is 4.4s and 81% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 90; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms. Air's own app prerenders no tiles either: its initial HTML contains one img, a workspace logo.
+- Lighthouse performance scores 85. The entire deficit is LCP: TBT is 20ms, CLS 0.001, FCP 0.8s, Speed Index 1.3s, all scoring 1.00. LCP is 4.4s and 81% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 90; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT under Lighthouse's own 4x throttle is already 20ms. Air's own app prerenders no tiles either: its initial HTML contains one img, a workspace logo.

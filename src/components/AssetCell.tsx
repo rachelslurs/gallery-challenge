@@ -136,6 +136,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           layer, which keeps this to three nodes.
         */}
         <div
+          data-hover-overlay
           className={clsx(
             "pointer-events-none absolute inset-x-0 bottom-0 flex flex-col justify-end gap-0.5 p-2",
             // Arbitrary values on purpose: this project pins Tailwind 3.3,

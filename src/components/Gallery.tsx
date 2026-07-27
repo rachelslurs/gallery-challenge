@@ -585,6 +585,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         <div className="px-2 py-2 sm:px-6 sm:py-4">
           <div
             ref={contentRef}
+            // Suppresses the per-tile hover overlay while a group is selected.
+            data-multiselect={count > 1 ? "true" : undefined}
             onClick={handleClick}
             onMouseDown={handleMouseDown}
             onContextMenu={handleContextMenu}
