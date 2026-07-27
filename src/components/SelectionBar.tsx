@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import { COPY } from "@/lib/copy";
+import { resolveBar } from "@/lib/selectionBar";
 
 const iconButton = clsx(
   "relative grid h-6 w-6 shrink-0 place-items-center rounded text-neutral-50",
@@ -48,12 +49,21 @@ const SelectionBar = ({
   onClear,
   onUndo,
 }: SelectionBarProps) => {
-  const count = assetCount + boardCount;
-  const visible = Boolean(notice || moved || count > 0);
-  const showClear = !notice && !moved && count > 0;
-  // Boards can be selected but not moved, so a mixed selection does less than
-  // its count suggests. Saying so beats letting a drag silently do half of it.
-  const mixed = showClear && assetCount > 0 && boardCount > 0;
+  // Precedence between the three things this bar reports lives in one tested
+  // function rather than in a chain of ternaries below.
+  const state = resolveBar({ notice, moved, assets: assetCount, boards: boardCount });
+  const visible = state.kind !== "hidden";
+  const showClear = state.kind === "selection";
+  const mixed = state.kind === "selection" && state.mixed;
+
+  const message =
+    state.kind === "notice"
+      ? state.message
+      : state.kind === "moved"
+        ? COPY.movedToBoard(state.count, state.board)
+        : state.kind === "selection"
+          ? COPY.selectionSummary(state.assets, state.boards, boardTitle)
+          : "";
 
   /*
     The live region stays mounted whether or not anything is selected. Screen
@@ -119,7 +129,7 @@ const SelectionBar = ({
               </div>
             </div>
 
-            {moved && !notice && (
+            {state.kind === "moved" && (
               <button
                 type="button"
                 onClick={onUndo}

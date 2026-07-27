@@ -9,7 +9,7 @@ Live: https://gallery-challenge-one.vercel.app
 ```bash
 npm install
 npm run dev    # http://localhost:3000
-npm test       # 104 tests, ~400ms
+npm test       # 118 tests, ~400ms
 ```
 
 ## Requirements status
@@ -55,7 +55,8 @@ assets loaded.
 | Video elements at rest | 0; a preview mounts on hover and unmounts on leave, one at most |
 | Cumulative layout shift | 0.00; every cell's height is known before its image loads |
 | Sample photo payload | 1.4MB original; 541KB at imgix defaults; 30KB at `w=400` |
-| Production LCP, unthrottled | 278ms and 415ms on two runs of the same build |
+| LCP, unthrottled local production build | 278ms and 415ms on two runs of the same build |
+| LCP, Lighthouse mobile simulation | 4.4s. Different methodology, not a contradiction: Lighthouse projects the hydrate-then-fetch chain onto 4x CPU and a 150ms RTT |
 | Production TTFB | 2-3ms; the route is statically prerendered with `revalidate = 300` |
 
 ## Decisions
@@ -113,4 +114,4 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 - Shift-click ranges and cmd+A cover assets only. The selection holds both kinds but the ordered list behind ranges is the asset list, so a range spanning a board and an asset does nothing sensible.
 - Download and Share were removed from the action bar rather than left inert: neither has an endpoint behind it.
 - No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.
-- Lighthouse performance scores 89. The entire deficit is LCP: TBT is 24ms, CLS 0.001, FCP 0.77s, Speed Index 1.04s, all scoring 1.00. LCP is 3.77s and 82% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 94; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms. Air's own app prerenders no tiles either: its initial HTML contains one img, a workspace logo.
+- Lighthouse performance scores 85. The entire deficit is LCP: TBT is 20ms, CLS 0.001, FCP 0.8s, Speed Index 1.3s, all scoring 1.00. LCP is 4.4s and 81% of that is load delay, because the prerendered HTML contains no `<img>` tags for the preload scanner to find. Preloading the first tiles in `<head>` would reach roughly 90; passing that needs the first row server-rendered against an assumed viewport. I left it alone because the stated grading criterion is interaction under a 6x CPU throttle, and TBT at 4x is already 24ms. Air's own app prerenders no tiles either: its initial HTML contains one img, a workspace logo.

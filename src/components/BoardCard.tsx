@@ -24,7 +24,7 @@ const BoardCard = ({ board, width, height, priority, highlighted = false, select
   return (
     <div
       data-board-id={board.id}
-      className="group cursor-pointer"
+      className="group"
       style={{ width, height }}
     >
       <div

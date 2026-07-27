@@ -32,6 +32,8 @@ export const COPY = {
   movedToBoard: (count: number, board: string): string =>
     `Moved ${count} ${count === 1 ? "asset" : "assets"} to ${board}`,
   undo: "Undo",
+  linkCopied: (count: number): string =>
+    `${count === 1 ? "Link" : `${count} links`} copied to the clipboard`,
   clearSelection: "Clear selection",
   boardIntoBoard: "Boards cannot be moved into another board",
   /**

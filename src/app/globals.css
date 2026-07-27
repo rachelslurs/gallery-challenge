@@ -13,3 +13,25 @@
     transform: translateY(0);
   }
 }
+
+/*
+  Drag cursors are set on <body> rather than on the wall, so they win over the
+  per-tile cursor without re-rendering 40 memoized cells every time a gesture
+  starts or ends.
+*/
+body[data-gesture],
+body[data-gesture] * {
+  cursor: inherit !important;
+}
+body[data-gesture="marquee"] {
+  cursor: crosshair;
+}
+body[data-gesture="reorder"] {
+  cursor: grabbing;
+}
+body[data-gesture="drop"] {
+  cursor: copy;
+}
+body[data-gesture="refused"] {
+  cursor: not-allowed;
+}

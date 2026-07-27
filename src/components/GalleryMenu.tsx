@@ -64,14 +64,15 @@ const GalleryMenu = ({
 
   const items = useMemo<MenuItemSpec[]>(() => {
     if (target === null) return [];
-    if (target.kind === "board") {
-      return [
-        { action: "open", label: MENU_COPY.openBoard },
-        { action: "copyLink", label: MENU_COPY.copyLink },
-      ];
-    }
     const count = target.selectionCount;
     const many = count > 1;
+
+    if (target.kind === "board") {
+      return [
+        { action: "open", label: many ? MENU_COPY.openBoards(count) : MENU_COPY.openBoard },
+        { action: "copyLink", label: many ? MENU_COPY.copyLinks(count) : MENU_COPY.copyLink },
+      ];
+    }
     return [
       { action: "open", label: MENU_COPY.openLabel },
       {

@@ -9,6 +9,8 @@ export const MENU_COPY = {
   copyLink: "Copy link",
   renameBoard: "Rename board",
   openBoard: "Open board",
+  openBoards: (n: number): string => `Open ${n} boards`,
+  copyLinks: (n: number): string => `Copy ${n} links`,
   assetMenuLabel: "Asset actions",
   boardMenuLabel: "Board actions",
 } as const;

@@ -23,7 +23,11 @@ export interface BoardsListResponse {
 }
 
 const parentBoardId = "c74bbbc8-602b-4c88-be71-9e21b36b0514";
-const shortId = "bDkBvnzpB";
+export const shortId = "bDkBvnzpB";
+
+/** Public URL for a board on the reference deployment. */
+export const boardUrl = (boardId: string): string =>
+  `https://app.air.inc/a/${shortId}/b/${boardId}`;
 
 export const fetchBoards = (): Promise<BoardsListResponse> =>
   fetch(`https://api.air.inc/shorturl/${shortId}/boards/${parentBoardId}`, {

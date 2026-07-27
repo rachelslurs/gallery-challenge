@@ -57,6 +57,9 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
         // untouched. The only things that move a tile are a reorder and a
         // resize, which is precisely when the movement is worth showing.
         "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
+        // Only a selected tile can be dragged, and nothing else on screen says
+        // so. The cursor is what makes that rule discoverable.
+        selected && "cursor-grab",
         // The ring sits on the cell edge while the image is inset, so the 4px
         // margin reads as a gap between photo and ring. Its radius is the
         // image's 12px plus that inset, keeping the two curves concentric.

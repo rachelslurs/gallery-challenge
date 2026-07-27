@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from "react";
 import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
-import type { Board } from "@/app/api/boards";
+import { boardUrl, type Board } from "@/app/api/boards";
 import { COPY } from "@/lib/copy";
 import { cellsInBox, toContentRect } from "@/lib/geometry";
 import { dropTargetAt, moveItems, type DropTarget, type Positioned } from "@/lib/reorder";
@@ -19,6 +19,8 @@ import SectionHeader from "./SectionHeader";
 import SelectionBar from "./SelectionBar";
 
 const OVERSCAN = 3;
+/** How long a move stays undoable before the offer withdraws itself. */
+const UNDO_WINDOW_MS = 8000;
 /** Start the next page once the window is this many rows from the end. */
 const PREFETCH_ROWS = 4;
 /**
@@ -74,6 +76,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   );
 
   const assetRows = useMemo(() => rows.filter(isAssetRow), [rows]);
+  const assetById = useMemo(() => new Map(assets.map((asset) => [asset.id, asset])), [assets]);
   const boardTitleById = useMemo(
     () => new Map(initialBoards.map((board) => [board.id, board.title])),
     [initialBoards],
@@ -141,6 +144,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const hoverBoardRef = useRef<string | null>(null);
   const [hoverBoard, setHoverBoard] = useState<string | null>(null);
   const [dragKind, setDragKind] = useState<"assets" | "board" | null>(null);
+  const [marqueeActive, setMarqueeActive] = useState(false);
   // Snapshot for undo. There is no write endpoint, so a move is a local
   // filter and reversing it means restoring the previous array wholesale.
   const undoRef = useRef<Asset[] | null>(null);
@@ -165,6 +169,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const handleSelectionStart = useCallback(
     (event: MouseEvent | globalThis.MouseEvent): void => {
       marqueeMovedRef.current = false;
+      setMarqueeActive(true);
       beginMarquee(event.shiftKey || event.metaKey || event.ctrlKey);
     },
     [beginMarquee],
@@ -202,6 +207,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     isEnabled: marqueeEnabled,
     shouldStartSelecting,
     onSelectionStart: handleSelectionStart,
+    onSelectionEnd: () => setMarqueeActive(false),
     onSelectionChange: handleSelectionChange,
     selectionProps: {
       style: {
@@ -281,8 +287,16 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
    */
   useEffect(() => {
     const DRAG_THRESHOLD_PX = 5;
+    let frame = 0;
+    let pending: { x: number; y: number; buttons: number } | null = null;
 
-    const onMove = (event: globalThis.MouseEvent): void => {
+    const process = (): void => {
+      frame = 0;
+      const point = pending;
+      pending = null;
+      if (point === null) return;
+      const event = { clientX: point.x, clientY: point.y, buttons: point.buttons };
+
       const drag = dragRef.current;
       const content = contentRef.current;
       if (!drag || !content) return;
@@ -347,7 +361,21 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       setDropTarget(next);
     };
 
+    // Raw mousemove outruns paint, and each event would otherwise cost a forced
+    // hit-test plus a scan of every cell. One frame, one evaluation.
+    const onMove = (event: globalThis.MouseEvent): void => {
+      if (!dragRef.current) return;
+      pending = { x: event.clientX, y: event.clientY, buttons: event.buttons };
+      if (frame) return;
+      frame = requestAnimationFrame(process);
+    };
+
     const onUp = (): void => {
+      if (frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      }
+      pending = null;
       const drag = dragRef.current;
       const target = dropTargetRef.current;
       const boardId = hoverBoardRef.current;
@@ -395,6 +423,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     window.addEventListener("mousemove", onMove);
     window.addEventListener("mouseup", onUp);
     return () => {
+      if (frame) cancelAnimationFrame(frame);
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
@@ -406,12 +435,62 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  /*
+    An undo offer describes the last thing that happened. Selecting something
+    starts a new one, so the offer is stale: keeping it would leave the bar
+    ambiguous about which of the two it is describing. It also expires on its
+    own, since an offer that never withdraws is not an offer.
+  */
+  useEffect(() => {
+    if (moved === null || count === 0) return;
+    // Retire it for good rather than letting it reappear if the selection is
+    // cleared again inside the undo window.
+    undoRef.current = null;
+    setMoved(null);
+  }, [moved, count]);
+
+  useEffect(() => {
+    if (moved === null) return;
+    const timer = window.setTimeout(() => {
+      undoRef.current = null;
+      setMoved(null);
+    }, UNDO_WINDOW_MS);
+    return () => window.clearTimeout(timer);
+  }, [moved]);
+
   const blockedDrag = dragKind === "board";
   // Boards live in the same selection set, so the split has to be derived.
   const selectedAssetCount = useMemo(
     () => assetIds.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0),
     [assetIds, selected],
   );
+
+  /*
+    One attribute on <body> drives every drag cursor. Putting it there rather
+    than on the wall lets it override the per-tile cursor without giving the
+    memoized cells a prop that changes whenever a gesture starts.
+  */
+  useEffect(() => {
+    const gesture =
+      dragKind === "board" && hoverBoard
+        ? "refused"
+        : dragKind === "assets"
+          ? hoverBoard
+            ? "drop"
+            : "reorder"
+          : marqueeActive
+            ? "marquee"
+            : null;
+
+    if (gesture === null) {
+      delete document.body.dataset.gesture;
+      return;
+    }
+    document.body.dataset.gesture = gesture;
+    return () => {
+      delete document.body.dataset.gesture;
+    };
+  }, [dragKind, hoverBoard, marqueeActive]);
 
   const dropIndicator = useMemo(() => {
     if (!dropTarget) return null;
@@ -454,13 +533,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       }
       const boardEl = element.closest<HTMLElement>("[data-board-id]");
       if (boardEl?.dataset.boardId) {
+        const id = boardEl.dataset.boardId;
         return {
           kind: "board",
-          id: boardEl.dataset.boardId,
+          id,
           title: boardEl.textContent?.trim() ?? "",
           x,
           y,
-          selectionCount: 1,
+          selectionCount: selected.has(id) ? count : 1,
         };
       }
       return null;
@@ -521,7 +601,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       event.preventDefault();
       // Right-clicking outside the current selection reduces it to that item,
       // so the menu's count and what it acts on can never disagree.
-      if (target.kind === "asset" && !selected.has(target.id)) selectOnly(target.id);
+      if (!selected.has(target.id)) selectOnly(target.id);
       setMenuTarget(target);
     },
     [targetFrom, selected, selectOnly],
@@ -531,6 +611,38 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
   const handleMenuAction = useCallback(
     (action: MenuAction, target: MenuTarget): void => {
+      const targetIds =
+        target.selectionCount > 1 && selected.has(target.id) ? Array.from(selected) : [target.id];
+      const urlFor = (id: string): string =>
+        boardTitleById.has(id) ? boardUrl(id) : (assetById.get(id)?.image ?? "");
+
+      if (action === "copyLink") {
+        void navigator.clipboard?.writeText(targetIds.map(urlFor).filter(Boolean).join("\n"));
+        setNotice(COPY.linkCopied(targetIds.length));
+        return;
+      }
+
+      if (action === "open") {
+        // Only the clicked item, however many are selected: opening a dozen
+        // tabs from one menu click is not what anyone means by "open".
+        const url = urlFor(target.id);
+        if (url) window.open(url, "_blank", "noopener,noreferrer");
+        return;
+      }
+
+      if (action === "download") {
+        targetIds.forEach((id) => {
+          const url = urlFor(id);
+          if (!url) return;
+          const link = document.createElement("a");
+          link.href = url;
+          link.download = "";
+          link.rel = "noopener";
+          link.click();
+        });
+        return;
+      }
+
       if (action !== "remove" || target.kind !== "asset") return;
       // No write endpoint exists on this API, so removal is local by necessity.
       const ids = target.selectionCount > 1 ? Array.from(selected) : [target.id];
@@ -538,7 +650,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       setAssets((previous) => previous.filter((asset) => !removing.has(asset.id)));
       clear();
     },
-    [selected, setAssets, clear],
+    [selected, setAssets, clear, boardTitleById, assetById],
   );
 
   // Depends on `rows.length` as well as the visible range: a scroll that stops
