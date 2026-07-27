@@ -61,11 +61,20 @@ as a median and a count over 32ms rather than an average, since a mean hides
 exactly the stalls that get noticed. The relayout cost is a Node benchmark of
 `justify` over 761 items, averaged across 200 runs.
 
+These are sensitive to what else the machine is doing, more than I expected.
+The same build measured an 8ms median scroll on an idle machine and 39ms with a
+dev server and five browser tabs alongside it, drifting upward run to run.
+Every figure above is the median of repeated runs on an otherwise idle machine,
+checked for drift before being written down, at a verified 1440x900 viewport
+with the full list loaded. A run that reports a number while the page has not
+hydrated, or at the wrong viewport, looks entirely plausible and means nothing.
+
 | Measurement | Result |
 | --- | --- |
-| DOM with all 761 assets loaded | 41 rendered cells, 307 DOM nodes, for 43,051px of content |
-| Scroll at 6x CPU throttle, 3000px/s flick | 14ms median frame gap; 22 of 118 frames over 32ms |
-| Marquee sweep at 6x CPU throttle | 8ms median frame gap; p95 11ms; 0 of 88 frames over 32ms |
+| DOM with all 761 assets loaded | 51 rendered cells, 509 nodes, 9 per cell, against 40,312px of content |
+| Scroll at 6x CPU throttle, 3000px/s | 8ms median frame gap, p95 9ms, 0 of 107 frames over 32ms, across four runs |
+| Marquee sweep at 6x CPU throttle | 8ms median, p95 9ms, 0 of 87 over 32ms, across three runs |
+| Reorder drag at 6x CPU throttle | 8ms median, p95 9ms, 0 of 77 over 32ms, across three runs |
 | Video elements at rest | 0; a preview mounts on hover and unmounts on leave, one at most |
 | Cumulative layout shift | 0.00; every cell's height is known before its image loads |
 | Sample photo payload | 1.4MB original; 541KB at imgix defaults; 30KB at `w=400` |

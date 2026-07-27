@@ -142,7 +142,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
             // Arbitrary values on purpose: this project pins Tailwind 3.3,
             // where min-h-24 does not exist and the gradient-stop utilities
             // silently produced no background-image.
-            "min-h-[96px] bg-[linear-gradient(to_top,rgba(0,0,0,0.85),transparent)]",
+            "min-h-[96px] group-hover:bg-[linear-gradient(to_top,rgba(0,0,0,0.85),transparent)]",
             "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
           )}
         >
@@ -166,7 +166,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           aria-label={COPY.assetActions}
           className={clsx(
             "absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded",
-            "bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80",
+            "bg-black/60 text-white transition-colors hover:bg-black/80",
             "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
             "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
           )}
