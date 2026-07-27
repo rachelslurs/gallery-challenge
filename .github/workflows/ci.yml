@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A new push supersedes whatever was already running for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      # The gallery's geometry is pure and covered above. This step exists to
+      # catch what unit tests cannot: a component that fails to compile, or a
+      # server/client boundary violation that only surfaces at build time.
+      #
+      # The build prerenders the page, which calls api.air.inc. That fetch is
+      # wrapped in try/catch, so an outage degrades to an empty board list
+      # rather than failing CI on a third party's availability.
+      - name: Build
+        run: npm run build
