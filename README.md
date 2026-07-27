@@ -48,9 +48,9 @@ Every number below is measured, on the deployed build, with Chrome DevTools.
 
 | Measurement | Result |
 | --- | --- |
-| DOM with all 761 assets loaded | 41 rendered cells, 471 DOM nodes, for 43,051px of content |
-| Scroll at 6x CPU throttle, 3000px/s flick | 15ms median frame gap; 23 of 118 frames over 32ms |
-| Marquee sweep at 6x CPU throttle | 9ms median frame gap; p99 15ms; 0 of 88 frames over 32ms |
+| DOM with all 761 assets loaded | 41 rendered cells, 307 DOM nodes, for 43,051px of content |
+| Scroll at 6x CPU throttle, 3000px/s flick | 14ms median frame gap; 22 of 118 frames over 32ms |
+| Marquee sweep at 6x CPU throttle | 8ms median frame gap; p95 11ms; 0 of 88 frames over 32ms |
 | Video elements at rest | 0; a preview mounts on hover and unmounts on leave, one at most |
 | Cumulative layout shift | 0.00; every cell's height is known before its image loads |
 | Sample photo payload | 1.4MB original; 541KB at imgix defaults; 30KB at `w=400` |
@@ -66,6 +66,12 @@ Every number below is measured, on the deployed build, with Chrome DevTools.
 **The marquee starts anywhere, including on an image.** That matches the reference gallery, and it means a card cannot also own pointer-down. The two gestures are told apart by selection instead: pressing an already-selected tile moves it, pressing anything else draws a box.
 
 **Hover state lives in the cell, not the wall.** Video previews mount on hover. Lifting that state to the gallery would re-render every mounted tile on each pointer move between tiles; kept local, only the tile entered and the tile left re-render, and exactly one video is ever mounted.
+
+**Decoration is pseudo-elements, not nodes.** The selection ring and the hover
+tint are `::before` and `::after` rather than two extra divs per cell, and the
+ellipsis is one path rather than three circles. That is 6 DOM nodes per tile
+instead of 11, and 307 in the document instead of 471, with nothing rendering
+differently.
 
 **One menu and one action bar, not one per tile.** Both are driven by a target descriptor at the root. Mounting either per cell would mean 761 of them. The ellipsis is marked with a data attribute rather than given an onClick, so cells still take no callback props and keep their memoization.
 
@@ -91,10 +97,16 @@ Every number below is measured, on the deployed build, with Chrome DevTools.
 - One floating action bar owns everything transient, so the selection count, the undo after a move, and a refusal can never stack or fight for the same corner.
 - `.nvmrc` moved from the starter's 18.17.0 to 22.20.0, a deliberate deviation: vitest 4 requires Node 20 or later, so a CI run honoring the starter's pin would have failed before running a single test.
 
+## Not built
+
+Auto-scroll while a marquee or reorder drag passes the viewport edge. It is not
+in the brief; I started it because dragging past the fold otherwise limits a
+selection to one screenful. `src/lib/autoScroll.ts` holds a tested velocity ramp
+and is not wired to anything.
+
 ## Known gaps
 
 - Boards can be selected and dropped onto, but not moved into one another. Attempting it turns the destination red and explains the refusal rather than failing silently. A mixed selection moves only its assets.
-- No auto-scroll while a marquee or reorder drag passes the viewport edge. `src/lib/autoScroll.ts` is written and tested but not wired in.
 - Shift-click ranges and cmd+A cover assets only. The selection holds both kinds but the ordered list behind ranges is the asset list, so a range spanning a board and an asset does nothing sensible.
 - Download and Share were removed from the action bar rather than left inert: neither has an endpoint behind it.
 - No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.

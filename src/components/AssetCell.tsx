@@ -51,7 +51,15 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
   return (
     <div
       data-asset-id={asset.id}
-      className="group absolute left-0 top-0"
+      className={clsx(
+        "group absolute left-0 top-0",
+        // The ring sits on the cell edge while the image is inset, so the 4px
+        // margin reads as a gap between photo and ring. Its radius is the
+        // image's 12px plus that inset, keeping the two curves concentric.
+        "before:pointer-events-none before:absolute before:inset-0 before:rounded-2xl before:content-['']",
+        "before:transition-[box-shadow] before:duration-150",
+        selected ? "before:shadow-[inset_0_0_0_2px_#3b82f6]" : "before:shadow-none",
+      )}
       style={{ transform: `translate3d(${x}px, ${y}px, 0)`, width: w, height: h }}
       {...(preview && {
         onMouseEnter: () => setPreviewing(true),
@@ -61,7 +69,13 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
       <div
         className={clsx(
           "absolute inset-1 overflow-hidden rounded-xl transition-colors duration-150",
-          selected ? "bg-neutral-300" : "bg-neutral-200",
+          // The tint and the ring are decoration, so they are pseudo-elements
+          // rather than nodes. Two divs per cell is 80-odd elements across a
+          // full window for something that paints identically either way.
+          "after:pointer-events-none after:absolute after:inset-0 after:transition-colors after:duration-150 after:content-['']",
+          selected
+            ? "bg-neutral-300 after:bg-blue-500/10"
+            : "bg-neutral-200 group-hover:after:bg-black/5",
         )}
       >
         {asset.image ? (
@@ -112,14 +126,6 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           </div>
         )}
 
-        <div
-          aria-hidden
-          className={clsx(
-            "pointer-events-none absolute inset-0 transition-colors duration-150",
-            selected ? "bg-blue-500/10" : "group-hover:bg-black/5",
-          )}
-        />
-
         {/*
           Marked with a data attribute rather than given an onClick, so the one
           delegated listener on the wall handles it and the cell keeps taking no
@@ -138,30 +144,11 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           )}
         >
           <svg viewBox="0 0 16 16" className="pointer-events-none h-4 w-4 fill-current" aria-hidden>
-            <circle cx="3.5" cy="8" r="1.4" />
-            <circle cx="8" cy="8" r="1.4" />
-            <circle cx="12.5" cy="8" r="1.4" />
+            <path d="M2.1 8a1.4 1.4 0 112.8 0 1.4 1.4 0 01-2.8 0zm4.5 0a1.4 1.4 0 112.8 0 1.4 1.4 0 01-2.8 0zm4.5 0a1.4 1.4 0 112.8 0 1.4 1.4 0 01-2.8 0z" />
           </svg>
         </button>
       </div>
 
-      {/*
-        The ring sits on the cell edge while the image is inset, so the 4px
-        margin becomes a gap between photo and ring. Its radius is the image's
-        12px plus that 4px inset, which keeps the two curves concentric.
-
-        The colour is set in exactly one branch: listing ring-transparent and
-        ring-blue-500 together would leave the winner to Tailwind's stylesheet
-        order rather than to this condition.
-      */}
-      <div
-        aria-hidden
-        className={clsx(
-          "pointer-events-none absolute inset-0 rounded-2xl ring-2 ring-inset",
-          "transition-[box-shadow] duration-150",
-          selected ? "ring-blue-500" : "ring-transparent",
-        )}
-      />
     </div>
   );
 };
