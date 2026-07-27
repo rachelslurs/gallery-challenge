@@ -385,6 +385,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   }, [notice]);
 
   const blockedDrag = dragRef.current?.kind === "board";
+  // Boards live in the same selection set, so the split has to be derived.
+  const selectedAssetCount = useMemo(
+    () => assetIds.reduce((total, id) => (selected.has(id) ? total + 1 : total), 0),
+    [assetIds, selected],
+  );
 
   const dropIndicator = useMemo(() => {
     if (!dropTarget) return null;
@@ -574,7 +579,23 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         onAction={handleMenuAction}
       />
 
-      <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-x-hidden overflow-y-auto">
+      {/*
+        One tab stop for the wall. A scrollable region that cannot take focus is
+        unreachable by keyboard except as a side effect of tabbing through the
+        controls inside it; with tabIndex the browser supplies arrow, page and
+        home/end scrolling for free.
+      */}
+      <div
+        ref={scrollRef}
+        onScroll={onScroll}
+        tabIndex={0}
+        role="region"
+        aria-label={COPY.assetsSection}
+        className={clsx(
+          "flex-1 overflow-x-hidden overflow-y-auto",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500",
+        )}
+      >
         {/* Cells inset their images by 4px, so this padding lands the outer
             image edge at 12px on mobile and 28px above it, matching the
             reference gallery's gutters. */}
@@ -669,7 +690,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                   return (
                     <div
                       key={row.id}
-                      className="absolute left-0 right-0 flex items-center justify-center text-sm text-neutral-500"
+                      className="absolute left-0 right-0 flex items-center justify-center text-sm text-neutral-600"
                       style={{ transform: `translate3d(0, ${row.y}px, 0)`, height: row.h }}
                     >
                       {row.state === "loading" && (
@@ -688,7 +709,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       <SelectionBar
         notice={notice}
-        count={count}
+        assetCount={selectedAssetCount}
+        boardCount={count - selectedAssetCount}
         boardTitle={boardTitle}
         moved={moved}
         onClear={clear}

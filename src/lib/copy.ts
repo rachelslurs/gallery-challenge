@@ -39,6 +39,18 @@ export const COPY = {
   boardIntoBoard: "Boards cannot be moved into another board",
   itemsSelectedFrom: (count: number, board: string): string =>
     `${count} ${count === 1 ? "item" : "items"} selected${board ? ` from ${board}` : ""}`,
+  /**
+   * Names each kind when a selection mixes them, because what the selection can
+   * do then depends on which kind you mean.
+   */
+  selectionSummary: (assets: number, boards: number, board: string): string => {
+    const asset = `${assets} ${assets === 1 ? "asset" : "assets"}`;
+    const brd = `${boards} ${boards === 1 ? "board" : "boards"}`;
+    if (boards === 0) return `${asset} selected${board ? ` from ${board}` : ""}`;
+    if (assets === 0) return `${brd} selected`;
+    return `${brd} and ${asset} selected`;
+  },
+  mixedSelectionHint: "Dragging moves the assets; boards stay put",
 } as const;
 
 /** Context strings for `messageFrom`, so error text reads consistently. */

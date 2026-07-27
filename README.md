@@ -103,10 +103,13 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 - Boards are selectable alongside assets, and their rects are derived from the row model rather than measured.
 - Dragging a board onto a board is refused visibly: the destination turns red and the action bar explains why, rather than the gesture silently doing nothing. A mixed selection moves only its assets.
 - One floating action bar owns everything transient, so the selection count, the undo after a move, and a refusal can never stack or fight for the same corner.
+- An accessibility pass: the wall is one focus stop with keyboard scrolling, section labels are real headings, menus return focus to whatever opened them and close on Tab, boards gained the keyboard-reachable menu trigger assets already had, focus reveals a tile's filename overlay as hover does, animation is gated on `prefers-reduced-motion`, and two text colours that failed WCAG AA against the canvas were corrected (neutral-400 measured 2.31:1, neutral-500 4.35:1, both now neutral-600 at 7.17:1).
+- The action bar names each kind when a selection mixes them, and says what that limits: boards can be selected but not moved, so "4 boards and 9 assets selected" carries "Dragging moves the assets; boards stay put".
 - `.nvmrc` moved from the starter's 18.17.0 to 22.20.0, a deliberate deviation: vitest 4 requires Node 20 or later, so a CI run honoring the starter's pin would have failed before running a single test.
 
 ## Known gaps
 
+- No per-tile keyboard navigation. The wall takes focus as one region and scrolls with the arrow keys, but selecting a specific tile needs a pointer. Doing it properly means roving tabindex or `aria-activedescendant`, both of which have to force the virtual window to include the focused index and then imperatively focus a newly mounted node. That is not a partial job, so it is not started.
 - Shift-click ranges and cmd+A cover assets only. The selection holds both kinds but the ordered list behind ranges is the asset list, so a range spanning a board and an asset does nothing sensible.
 - Download and Share were removed from the action bar rather than left inert: neither has an endpoint behind it.
 - No drag preview follows the cursor. The insertion point is shown instead and the tile stays put until release.

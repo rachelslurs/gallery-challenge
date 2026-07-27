@@ -12,7 +12,9 @@ export interface SectionHeaderProps {
 }
 
 const SectionHeader = ({ section, title, count, collapsed, onToggle }: SectionHeaderProps) => (
-  <button
+  // `contents` keeps the heading semantic without adding a box to the layout.
+  <h2 className="contents">
+    <button
     type="button"
     onClick={() => onToggle(section)}
     aria-expanded={!collapsed}
@@ -45,10 +47,11 @@ const SectionHeader = ({ section, title, count, collapsed, onToggle }: SectionHe
     {/* A small, tracked, uppercase label rather than a heading: the images are
         the content here, and the section marker should stay quiet. */}
     <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">{title}</span>
-    <span className="text-xs font-bold tabular-nums tracking-wider text-neutral-500">
+    <span className="text-xs font-bold tabular-nums tracking-wider text-neutral-600">
       {count.toLocaleString()}
     </span>
   </button>
+  </h2>
 );
 
 export default SectionHeader;

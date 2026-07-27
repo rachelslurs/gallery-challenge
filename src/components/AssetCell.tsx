@@ -56,7 +56,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
         // Positions are content coordinates, so scrolling leaves a transform
         // untouched. The only things that move a tile are a reorder and a
         // resize, which is precisely when the movement is worth showing.
-        "transition-transform duration-200 ease-out",
+        "motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out",
         // The ring sits on the cell edge while the image is inset, so the 4px
         // margin reads as a gap between photo and ring. Its radius is the
         // image's 12px plus that inset, keeping the two curves concentric.
@@ -139,7 +139,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
             // where min-h-24 does not exist and the gradient-stop utilities
             // silently produced no background-image.
             "min-h-[96px] bg-[linear-gradient(to_top,rgba(0,0,0,0.85),transparent)]",
-            "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
+            "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
           )}
         >
           <p className="truncate text-base font-medium leading-6 tracking-[-0.011em] text-white">
@@ -163,7 +163,7 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           className={clsx(
             "absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded",
             "bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80",
-            "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
+            "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
             "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
           )}
         >

@@ -2,6 +2,7 @@
 
 import clsx from "clsx";
 import type { Board } from "@/app/api/boards";
+import { COPY } from "@/lib/copy";
 import { thumbnail } from "@/lib/imgix";
 
 export interface BoardCardProps {
@@ -56,6 +57,22 @@ const BoardCard = ({ board, width, height, priority, highlighted = false, select
             </svg>
           </div>
         )}
+
+        <button
+          type="button"
+          data-menu-trigger="board"
+          aria-label={COPY.boardActions}
+          className={clsx(
+            "absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded",
+            "bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80",
+            "opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100",
+            "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
+          )}
+        >
+          <svg viewBox="0 0 16 16" className="pointer-events-none h-4 w-4 fill-current" aria-hidden>
+            <path d="M2.1 8a1.4 1.4 0 112.8 0 1.4 1.4 0 01-2.8 0zm4.5 0a1.4 1.4 0 112.8 0 1.4 1.4 0 01-2.8 0zm4.5 0a1.4 1.4 0 112.8 0 1.4 1.4 0 01-2.8 0z" />
+          </svg>
+        </button>
 
         {/*
           The title sits on the image over a gradient, as the reference does,

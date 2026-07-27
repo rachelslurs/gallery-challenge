@@ -105,6 +105,12 @@ const GalleryMenu = ({
 
   const handleMenuKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>): void => {
+      // Tab out closes rather than walking the remaining items and then
+      // leaking focus to the page while the menu stays open.
+      if (event.key === "Tab") {
+        onClose();
+        return;
+      }
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
       event.preventDefault();
       const menu = menuRef.current;
@@ -125,8 +131,21 @@ const GalleryMenu = ({
           : (activeIndex + step + buttons.length) % buttons.length;
       buttons[nextIndex]?.focus();
     },
-    [],
+    [onClose],
   );
+
+  /*
+    Return focus to whatever opened the menu. Without this, closing leaves
+    activeElement on <body>, so a keyboard user who opened the menu from a
+    tile's ellipsis is dropped to the top of the tab order.
+  */
+  useEffect(() => {
+    if (!mounted || target === null) return;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    return () => {
+      if (opener && document.contains(opener)) opener.focus();
+    };
+  }, [target, mounted]);
 
   // Reposition before paint so the flipped placement never flashes at the raw
   // pointer coordinates. Writing styles directly skips a measure-then-set-state
