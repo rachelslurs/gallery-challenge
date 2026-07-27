@@ -52,3 +52,59 @@ Check a field against an actual response before relying on its declared optional
 ## Toolchain
 
 `.nvmrc` pins Node 18.17.0. The installed version is 22.20.0. Path alias `@/*` resolves to `./src/*`.
+
+## Measurement gotchas
+
+Every one of these produced a confident, plausible, wrong number in this repo.
+The common shape is a measurement that cannot fail: it reports something even
+when the thing under test is not running.
+
+**Assert the page hydrated before trusting any browser measurement.** An
+unhydrated page still answers `scrollTop`, still runs `requestAnimationFrame`,
+and still yields a tidy frame-gap distribution. It is just measuring an empty
+document. `document.querySelectorAll('[data-asset-id]').length === 0` means
+abort, not "0 cells". The un-hydrated shell here is ~35 nodes and 326px tall.
+
+**`next build` while `next dev` is running clobbers the dev server.** Both write
+`.next`. The dev server then serves chunk URLs that no longer exist, the page
+never hydrates, and it looks like a code regression. Stop dev before building.
+
+**`next start` fails silently on a busy port.** It logs `EADDRINUSE` to its own
+log and exits, leaving whatever already owned the port answering. After a
+rebuild that old server serves a stale prerender referencing deleted chunks.
+Verify the served build is coherent before measuring:
+`curl -s localhost:PORT | grep -o '/_next/static/chunks/webpack-[a-z0-9]*\.js'`
+then fetch it and require a 200. A 404 means the numbers are worthless.
+
+**Synthetic mouse events do not trigger CSS `:hover`.** `dispatchEvent(new
+MouseEvent('mouseover'))` runs React handlers but never matches `:hover` or
+`group-hover`, so anything gated on them appears broken or, worse, appears
+fixed. Use a real pointer hover. React's `onMouseLeave` is synthesised from
+`mouseout`, not `mouseleave`, so a synthetic `mouseleave` does nothing either.
+
+**Reading an element's resting state proves nothing about its hover state.**
+Checking that a hover overlay computes `opacity: 0` while not hovering passes
+whether or not the suppression works.
+
+## Tailwind in this repo
+
+Pinned at 3.3.7, so utilities added in 3.4 silently produce no CSS: `size-*`
+and numeric `min-h-<n>` both did nothing here and were replaced with arbitrary
+values. When a class appears in the DOM but the computed style is unchanged,
+check the version before debugging the component.
+
+Two utilities setting the same property in one class list let the stylesheet
+order decide, not the order they are written. `ring-transparent` alongside
+`ring-blue-500` rendered nothing while both appeared in `className`. Set such a
+property in exactly one branch of the condition.
+
+Tailwind's `group-hover:` resolves at a higher specificity than a plain
+attribute selector, so a rule meant to override it needs `!important` or more
+specificity.
+
+## Shell
+
+`cd` inside a compound command persists for later commands in the same session.
+A `cd node_modules/...` here left a subsequent `npx tsc --noEmit` running in the
+wrong directory, where it found nothing and reported success. Prefer absolute
+paths, and be suspicious of a check that passes instantly.
