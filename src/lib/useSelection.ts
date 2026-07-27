@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { mergeMarquee, rangeBetween, toggled } from "./selection";
 
 const EMPTY: ReadonlySet<string> = new Set<string>();
 
@@ -21,19 +22,16 @@ export interface UseSelectionResult {
 /**
  * Selection state for the asset wall.
  *
- * Held as a `Set` of ids rather than a flag on each asset so that marquee
- * updates touch one piece of state instead of rewriting the asset array. Cells
- * receive a boolean and are memoized on it, so a marquee sweep re-renders only
- * the tiles whose membership actually changed.
+ * Held as a Set of ids rather than a flag on each asset, so a marquee update
+ * touches one piece of state instead of rewriting the asset array. Cells take a
+ * boolean and are memoized on it, so a sweep re-renders only the tiles whose
+ * membership changed.
+ *
+ * The decisions themselves live in `selection.ts` as pure functions; this hook
+ * only owns the React state and the shift-anchor.
  */
 export const useSelection = (orderedIds: readonly string[]): UseSelectionResult => {
   const [selected, setSelected] = useState<ReadonlySet<string>>(EMPTY);
-
-  const indexById = useMemo(() => {
-    const map = new Map<string, number>();
-    orderedIds.forEach((id, index) => map.set(id, index));
-    return map;
-  }, [orderedIds]);
 
   // Anchor for shift-extend, and the pre-marquee snapshot to union against.
   const anchorRef = useRef<string | null>(null);
@@ -46,11 +44,7 @@ export const useSelection = (orderedIds: readonly string[]): UseSelectionResult 
 
   const toggle = useCallback((id: string): void => {
     anchorRef.current = id;
-    setSelected((previous) => {
-      const next = new Set(previous);
-      if (!next.delete(id)) next.add(id);
-      return next;
-    });
+    setSelected((previous) => toggled(previous, id));
   }, []);
 
   const extendTo = useCallback(
@@ -62,14 +56,10 @@ export const useSelection = (orderedIds: readonly string[]): UseSelectionResult 
         return;
       }
 
-      const from = indexById.get(anchor);
-      const to = indexById.get(id);
-      if (from === undefined || to === undefined) return;
-
-      const [low, high] = from <= to ? [from, to] : [to, from];
-      setSelected(new Set(orderedIds.slice(low, high + 1)));
+      const range = rangeBetween(orderedIds, anchor, id);
+      if (range.length > 0) setSelected(new Set(range));
     },
-    [indexById, orderedIds],
+    [orderedIds],
   );
 
   const selectAll = useCallback((): void => {
@@ -90,25 +80,7 @@ export const useSelection = (orderedIds: readonly string[]): UseSelectionResult 
   );
 
   const applyMarquee = useCallback((ids: readonly string[]): void => {
-    const base = marqueeBaseRef.current;
-    setSelected((previous) => {
-      // Bail out before allocating if nothing changed, so a marquee dragged
-      // across empty space does not re-render the wall on every frame.
-      if (previous.size === base.size + ids.length) {
-        let identical = true;
-        for (const id of ids) {
-          if (!previous.has(id)) {
-            identical = false;
-            break;
-          }
-        }
-        if (identical) return previous;
-      }
-
-      const next = new Set(base);
-      ids.forEach((id) => next.add(id));
-      return next;
-    });
+    setSelected((previous) => mergeMarquee(marqueeBaseRef.current, ids, previous));
   }, []);
 
   return {

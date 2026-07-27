@@ -190,20 +190,39 @@ describe("cellsInBox", () => {
 });
 
 describe("toContentRect", () => {
-  const containerRect = { left: 24, top: 112 } as DOMRect;
-
-  it("subtracts the container origin and adds the scroll offset", () => {
+  it("subtracts the content element's origin and preserves size", () => {
     const box: Rect = { left: 300, top: 400, width: 120, height: 80 };
-    expect(toContentRect(box, containerRect, 2500, 40)).toEqual({
-      left: 300 - 24 + 40,
-      top: 400 - 112 + 2500,
+    expect(toContentRect(box, { left: 24, top: 112 })).toEqual({
+      left: 276,
+      top: 288,
       width: 120,
       height: 80,
     });
   });
 
-  it("defaults scrollLeft to 0", () => {
+  it("maps a box at the origin to zero", () => {
     const box: Rect = { left: 24, top: 112, width: 10, height: 10 };
-    expect(toContentRect(box, containerRect, 0)).toEqual({ left: 0, top: 0, width: 10, height: 10 });
+    expect(toContentRect(box, { left: 24, top: 112 })).toEqual({
+      left: 0,
+      top: 0,
+      width: 10,
+      height: 10,
+    });
+  });
+
+  /*
+   * A live getBoundingClientRect already moves with the scroll container, so a
+   * scrolled origin has a negative top and the conversion must not add scrollTop
+   * on top of it. Double-counting here is exactly what drew the marquee box
+   * thousands of pixels away from the cursor.
+   */
+  it("handles a scrolled origin without double-counting the offset", () => {
+    const box: Rect = { left: 100, top: 300, width: 50, height: 50 };
+    expect(toContentRect(box, { left: 24, top: -2500 })).toEqual({
+      left: 76,
+      top: 2800,
+      width: 50,
+      height: 50,
+    });
   });
 });

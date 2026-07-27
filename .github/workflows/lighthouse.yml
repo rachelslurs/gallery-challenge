@@ -1,0 +1,83 @@
+# Lighthouse audits the production build on every PR and push to main.
+# Accessibility gates the job: its checks are deterministic and the gallery's
+# hand-rolled keyboard interaction is worth protecting. Performance is collected
+# and reported only: shared runners plus images from air-prod.imgix.net make the
+# numbers swing (the same build measured 278ms and 415ms LCP minutes apart).
+
+name: Lighthouse
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A new push supersedes whatever was already running for the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Poll instead of a fixed sleep: a bare sleep fails on a slow runner and
+      # wastes time on a fast one. The background server survives this step.
+      - name: Start production server
+        run: |
+          npm start &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000 > /dev/null && exit 0
+            sleep 1
+          done
+          echo "Server did not respond on :3000 within 30s" >&2
+          exit 1
+
+      # Assertion levels, generated here so no config file lives in the repo:
+      #   accessibility   error at 0.9. Deterministic DOM checks; a failure is real.
+      #   seo             warn only. Deterministic, but the baseline for this app
+      #                   has never been measured and it has no meta description,
+      #                   so gating it would likely fail the first run. Promote to
+      #                   error once a green run establishes the real score.
+      #   best-practices  warn only. Its errors-in-console audit can trip on a
+      #                   transient imgix failure, so it reports without failing.
+      #   performance     off. Visible in the uploaded reports, never asserted.
+      - name: Write Lighthouse assertions
+        run: |
+          cat > lighthouserc.json <<'EOF'
+          {
+            "ci": {
+              "assert": {
+                "assertions": {
+                  "categories:accessibility": ["error", { "minScore": 0.9 }],
+                  "categories:seo": ["warn", { "minScore": 0.9 }],
+                  "categories:best-practices": ["warn", { "minScore": 0.9 }],
+                  "categories:performance": "off"
+                }
+              }
+            }
+          }
+          EOF
+
+      # Three runs damp single-sample noise; Lighthouse CI keeps the median as
+      # the representative run. Full reports for every category, performance
+      # included, are downloadable from the run's artifacts.
+      - name: Lighthouse
+        uses: treosh/lighthouse-ci-action@v12
+        with:
+          urls: http://localhost:3000
+          runs: 3
+          configPath: ./lighthouserc.json
+          uploadArtifacts: true

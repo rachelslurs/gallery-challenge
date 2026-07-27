@@ -4,7 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
 import type { Board } from "@/app/api/boards";
 import { COPY } from "@/lib/copy";
-import { cellsInBox } from "@/lib/geometry";
+import { cellsInBox, toContentRect } from "@/lib/geometry";
+import { resolveClick } from "@/lib/selection";
 import { buildRows, metricsFor, type SectionId, type VRow } from "@/lib/rows";
 import { useAssets } from "@/lib/useAssets";
 import { useSelection } from "@/lib/useSelection";
@@ -106,13 +107,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       // getBoundingClientRect is live, so the element's own offset already
       // reflects scroll position. The box arrives in viewport coordinates.
-      const origin = content.getBoundingClientRect();
-      const hits = cellsInBox(assetRowsRef.current, {
-        left: box.left - origin.left,
-        top: box.top - origin.top,
-        width: box.width,
-        height: box.height,
-      });
+      const hits = cellsInBox(
+        assetRowsRef.current,
+        toContentRect(box, content.getBoundingClientRect()),
+      );
 
       marqueeMovedRef.current = true;
       applyMarquee(hits.map((cell) => cell.item.id));
@@ -132,9 +130,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         // ancestor, so inside a scrolled container the box renders scrollTop
         // pixels too high. Fixed makes the coordinates mean what they say.
         position: "fixed",
-        border: "1px solid rgb(59 130 246)",
+        // The box is a sibling that precedes the scroller in the DOM, so
+        // without an explicit layer the tiles paint over it.
+        zIndex: 40,
+        // Border and fill are the same hue so the box reads as one translucent
+        // shape rather than an outline drawn around a separate tint.
+        border: "1px solid rgba(59, 130, 246, 0.35)",
         background: "rgba(59, 130, 246, 0.16)",
-        borderRadius: 2,
+        borderRadius: 6,
       },
     },
   });
@@ -155,28 +158,28 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // which would defeat their memoization.
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>): void => {
-      if (marqueeMovedRef.current) {
-        marqueeMovedRef.current = false;
-        return;
-      }
       if (!(event.target instanceof Element)) return;
 
-      // Controls inside the wall (section headers today, menu triggers next)
-      // are not background, and collapsing a section must not wipe a selection.
-      if (event.target.closest("button")) return;
-
       const cell = event.target.closest("[data-asset-id]");
-      if (!(cell instanceof HTMLElement)) {
-        clear();
-        return;
-      }
+      const intent = resolveClick({
+        marqueeMoved: marqueeMovedRef.current,
+        // Controls inside the wall (section headers today, menu triggers next)
+        // are not background, so they must not clear the selection.
+        onControl: event.target.closest("button") !== null,
+        assetId: cell instanceof HTMLElement ? cell.dataset.assetId ?? null : null,
+        modifiers: {
+          shiftKey: event.shiftKey,
+          metaKey: event.metaKey,
+          ctrlKey: event.ctrlKey,
+        },
+      });
+      marqueeMovedRef.current = false;
 
-      const id = cell.dataset.assetId;
-      if (!id) return;
-
-      if (event.shiftKey) extendTo(id);
-      else if (event.metaKey || event.ctrlKey) toggle(id);
-      else selectOnly(id);
+      if (intent.kind === "ignore") return;
+      if (intent.kind === "clear") clear();
+      else if (intent.kind === "extend") extendTo(intent.id);
+      else if (intent.kind === "toggle") toggle(intent.id);
+      else selectOnly(intent.id);
     },
     [clear, extendTo, toggle, selectOnly],
   );

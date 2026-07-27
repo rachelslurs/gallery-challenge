@@ -97,18 +97,17 @@ export function cellsInBox<T>(
 }
 
 /**
- * Convert a selection box from viewport coordinates into the scroll container's
- * content coordinates, so it can be compared against layout geometry directly.
+ * Convert a box in viewport coordinates into the content element's coordinate
+ * space, so it can be compared against layout geometry directly.
+ *
+ * No scroll offset is applied on purpose. `originRect` is expected to come from
+ * a live `getBoundingClientRect()`, which already moves with the scroll
+ * container, so adding scrollTop would double-count it.
  */
-export function toContentRect(
-  box: Rect,
-  containerRect: DOMRect,
-  scrollTop: number,
-  scrollLeft = 0,
-): Rect {
+export function toContentRect(box: Rect, originRect: { left: number; top: number }): Rect {
   return {
-    left: box.left - containerRect.left + scrollLeft,
-    top: box.top - containerRect.top + scrollTop,
+    left: box.left - originRect.left,
+    top: box.top - originRect.top,
     width: box.width,
     height: box.height,
   };
