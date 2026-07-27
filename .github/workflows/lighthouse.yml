@@ -53,7 +53,20 @@ jobs:
       #                   error once a green run establishes the real score.
       #   best-practices  warn only. Its errors-in-console audit can trip on a
       #                   transient imgix failure, so it reports without failing.
-      #   performance     off. Visible in the uploaded reports, never asserted.
+      #   performance     warn only. The composite score depends on network
+      #                   timing to a third-party CDN; the same build measured
+      #                   278ms and 415ms LCP minutes apart locally. Warning
+      #                   still prints the number on every run.
+      #
+      # Two performance audits are deterministic enough to gate on, and both
+      # protect something the gallery depends on:
+      #   cumulative-layout-shift  every cell's height is known before its image
+      #                   loads, so this is 0. Anything above 0.1 means that
+      #                   guarantee broke.
+      #   dom-size        the wall windows ~50 of 761 tiles, so the document
+      #                   holds a few hundred nodes. Rendering the full list
+      #                   would be several thousand. This is the cheapest
+      #                   possible regression test for virtualization.
       - name: Write Lighthouse assertions
         run: |
           cat > lighthouserc.json <<'EOF'
@@ -64,7 +77,9 @@ jobs:
                   "categories:accessibility": ["error", { "minScore": 0.9 }],
                   "categories:seo": ["warn", { "minScore": 0.9 }],
                   "categories:best-practices": ["warn", { "minScore": 0.9 }],
-                  "categories:performance": "off"
+                  "categories:performance": ["warn", { "minScore": 0.8 }],
+                  "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+                  "dom-size": ["error", { "maxNumericValue": 1500 }]
                 }
               }
             }
