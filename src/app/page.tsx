@@ -5,9 +5,15 @@ import { COPY } from "@/lib/copy";
 /**
  * Sub-boards are fetched on the server so the first paint already has them.
  * Assets stay on the client because they are cursor-paginated and reordered
- * locally. Next does not cache POST fetches, so this stays dynamic without a
- * route segment config.
+ * locally.
+ *
+ * This route uses no dynamic APIs, so Next prerenders it at build time and the
+ * board list would otherwise be frozen until the next deploy. Revalidating
+ * keeps the document served as static HTML, which is worth roughly 590ms of
+ * TTFB against awaiting Air's API on every request, while still picking up
+ * board changes within the window.
  */
+export const revalidate = 300;
 export default async function Home() {
   let boards: Board[] = [];
   let title: string = COPY.galleryFallbackTitle;

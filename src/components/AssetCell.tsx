@@ -18,9 +18,15 @@ export interface AssetCellProps {
   w: number;
   h: number;
   selected: boolean;
+  /**
+   * True for tiles in the first screenful. Lazy-loading an above-the-fold image
+   * hides it from the preload scanner and drops it to Low priority, which shows
+   * up directly as LCP load delay.
+   */
+  priority: boolean;
 }
 
-const AssetCell = ({ asset, x, y, w, h, selected }: AssetCellProps) => {
+const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) => {
   const isVideo = asset.type === "video";
 
   return (
@@ -47,7 +53,8 @@ const AssetCell = ({ asset, x, y, w, h, selected }: AssetCellProps) => {
             srcSet={thumbnailSrcSet(asset.image, w)}
             sizes={`${Math.ceil(w)}px`}
             alt={asset.title}
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             decoding="async"
             draggable={false}
             className="h-full w-full select-none object-cover"

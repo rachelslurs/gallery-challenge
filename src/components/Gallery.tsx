@@ -13,6 +13,12 @@ import SectionHeader from "./SectionHeader";
 const OVERSCAN = 3;
 /** Start the next page once the window is this many rows from the end. */
 const PREFETCH_ROWS = 4;
+/**
+ * Rows loaded eagerly at high priority because they are on screen at first
+ * paint. Everything below stays lazy so the wall still costs almost nothing.
+ */
+const EAGER_ASSET_ROWS = 2;
+const EAGER_BOARD_ROWS = 1;
 
 const STATUS_COPY: Record<Extract<VRow, { kind: "status" }>["state"], string> = {
   loading: COPY.loadingMore,
@@ -115,7 +121,13 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                       }}
                     >
                       {row.boards.map((board) => (
-                        <BoardCard key={board.id} board={board} width={row.cardWidth} height={row.h} />
+                        <BoardCard
+                          key={board.id}
+                          board={board}
+                          width={row.cardWidth}
+                          height={row.h}
+                          priority={row.index < EAGER_BOARD_ROWS}
+                        />
                       ))}
                     </div>
                   );
@@ -130,6 +142,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                       w={cell.w}
                       h={cell.h}
                       selected={selected.has(cell.item.id)}
+                      priority={row.index < EAGER_ASSET_ROWS}
                     />
                   ));
 

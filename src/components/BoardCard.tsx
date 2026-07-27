@@ -8,9 +8,11 @@ export interface BoardCardProps {
   board: Board;
   width: number;
   height: number;
+  /** Board rows sit at the top of the page, so the first one loads eagerly. */
+  priority: boolean;
 }
 
-const BoardCard = ({ board, width, height }: BoardCardProps) => {
+const BoardCard = ({ board, width, height, priority }: BoardCardProps) => {
   const cover = board.thumbnails?.[0];
 
   return (
@@ -31,7 +33,8 @@ const BoardCard = ({ board, width, height }: BoardCardProps) => {
           <img
             src={thumbnail(cover, width)}
             alt=""
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : "auto"}
             decoding="async"
             draggable={false}
             className="h-full w-full select-none object-cover"

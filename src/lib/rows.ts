@@ -10,8 +10,8 @@ import type { Asset } from "./useAssets";
  */
 export type VRow =
   | { kind: "header"; id: string; y: number; h: number; section: SectionId; title: string; count: number }
-  | { kind: "boards"; id: string; y: number; h: number; boards: Board[]; cardWidth: number }
-  | { kind: "assets"; id: string; y: number; h: number; cells: Cell<Asset>[] }
+  | { kind: "boards"; id: string; y: number; h: number; index: number; boards: Board[]; cardWidth: number }
+  | { kind: "assets"; id: string; y: number; h: number; index: number; cells: Cell<Asset>[] }
   | { kind: "status"; id: string; y: number; h: number; state: "loading" | "end" | "empty" };
 
 export type SectionId = "boards" | "assets";
@@ -95,6 +95,7 @@ export function buildRows({
         push({
           kind: "boards",
           id: `boards-${i}`,
+          index: i / columns,
           h: cardHeight,
           boards: boards.slice(i, i + columns),
           cardWidth,
@@ -121,6 +122,7 @@ export function buildRows({
       push({
         kind: "assets",
         id: `assets-${i}`,
+        index: i,
         h: row.h,
         cells: row.cells.map((cell) => ({ ...cell, y: cell.y + offset })),
       });
