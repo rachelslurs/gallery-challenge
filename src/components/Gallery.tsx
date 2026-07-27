@@ -79,12 +79,17 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   // background click handler would immediately clear what was just selected.
   const marqueeMovedRef = useRef(false);
 
-  const shouldStartSelecting = useCallback((target: EventTarget | null): boolean => {
-    if (!(target instanceof Element)) return false;
-    if (!scrollRef.current?.contains(target)) return false;
-    // Cards own the pointer-down gesture so drag-to-reorder stays available.
-    return target.closest("[data-asset-id], [data-board-id]") === null;
-  }, [scrollRef]);
+  const shouldStartSelecting = useCallback(
+    (target: EventTarget | null): boolean => {
+      if (!(target instanceof Element)) return false;
+      // Anywhere inside the wall, including on top of a card, matching how the
+      // real gallery behaves. Drag-to-reorder will therefore need a different
+      // trigger than "pointer down on a card": dragging an already-selected
+      // item moves it, dragging anything else draws a box.
+      return Boolean(scrollRef.current?.contains(target));
+    },
+    [scrollRef],
+  );
 
   const handleSelectionStart = useCallback(
     (event: MouseEvent | globalThis.MouseEvent): void => {
@@ -122,6 +127,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     onSelectionChange: handleSelectionChange,
     selectionProps: {
       style: {
+        // The library draws the box with position:absolute at viewport
+        // coordinates. Absolute resolves against the nearest positioned
+        // ancestor, so inside a scrolled container the box renders scrollTop
+        // pixels too high. Fixed makes the coordinates mean what they say.
+        position: "fixed",
         border: "1px solid rgb(59 130 246)",
         background: "rgba(59, 130, 246, 0.16)",
         borderRadius: 2,
@@ -133,6 +143,14 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     setCollapsed((previous) => ({ ...previous, [section]: !previous[section] }));
   }, []);
 
+  // Every gesture starts here, so the marquee flag is cleared on mousedown
+  // rather than consumed by the next click. Clearing it only when a marquee
+  // begins left it set after a marquee ended, which swallowed the following
+  // click on a card and made selection need two clicks.
+  const handleMouseDown = useCallback((): void => {
+    marqueeMovedRef.current = false;
+  }, []);
+
   // One delegated handler rather than a callback prop on each of 761 cells,
   // which would defeat their memoization.
   const handleClick = useCallback(
@@ -142,6 +160,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         return;
       }
       if (!(event.target instanceof Element)) return;
+
+      // Controls inside the wall (section headers today, menu triggers next)
+      // are not background, and collapsing a section must not wipe a selection.
+      if (event.target.closest("button")) return;
 
       const cell = event.target.closest("[data-asset-id]");
       if (!(cell instanceof HTMLElement)) {
@@ -213,12 +235,21 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         )}
       </header>
 
+      {/*
+        Rendered outside the scroll container on purpose. The library offsets
+        the box by its parent's bounding rect, so mounting it inside a scrolled
+        element added the scroll offset twice and drew the box scrollTop pixels
+        away from the cursor. Out here the parent never scrolls, so the viewport
+        coordinates it reports mean what they say.
+      */}
+      <DragSelection />
+
       <div ref={scrollRef} onScroll={onScroll} className="flex-1 overflow-x-hidden overflow-y-auto">
         <div className="px-3 py-3 sm:px-6 sm:py-4">
-          <DragSelection />
           <div
             ref={contentRef}
             onClick={handleClick}
+            onMouseDown={handleMouseDown}
             className="relative w-full select-none"
             style={{ height }}
           >
