@@ -10,9 +10,11 @@ export interface BoardCardProps {
   height: number;
   /** Board rows sit at the top of the page, so the first one loads eagerly. */
   priority: boolean;
+  /** True while a drag hovers this board, so the drop destination is obvious. */
+  highlighted?: boolean;
 }
 
-const BoardCard = ({ board, width, height, priority }: BoardCardProps) => {
+const BoardCard = ({ board, width, height, priority, highlighted = false }: BoardCardProps) => {
   const cover = board.thumbnails?.[0];
 
   return (
@@ -24,7 +26,10 @@ const BoardCard = ({ board, width, height, priority }: BoardCardProps) => {
       <div
         className={clsx(
           "relative flex-1 overflow-hidden rounded bg-neutral-200",
-          "ring-1 ring-black/5 transition-shadow group-hover:ring-black/15",
+          "transition-shadow duration-150",
+          highlighted
+            ? "ring-2 ring-blue-500 ring-offset-2 ring-offset-neutral-100"
+            : "ring-1 ring-black/5 group-hover:ring-black/15",
         )}
       >
         {cover ? (

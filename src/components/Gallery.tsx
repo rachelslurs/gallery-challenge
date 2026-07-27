@@ -72,6 +72,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   );
 
   const assetRows = useMemo(() => rows.filter(isAssetRow), [rows]);
+  const boardTitleById = useMemo(
+    () => new Map(initialBoards.map((board) => [board.id, board.title])),
+    [initialBoards],
+  );
 
   const { scrollRef, range, onScroll } = useVirtualRange(rows, OVERSCAN);
 
@@ -101,6 +105,12 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const dragRef = useRef<{ ids: string[]; startX: number; startY: number; active: boolean } | null>(null);
   const dropTargetRef = useRef<DropTarget | null>(null);
   const [dropTarget, setDropTarget] = useState<DropTarget | null>(null);
+  const hoverBoardRef = useRef<string | null>(null);
+  const [hoverBoard, setHoverBoard] = useState<string | null>(null);
+  // Snapshot for undo. There is no write endpoint, so a move is a local
+  // filter and reversing it means restoring the previous array wholesale.
+  const undoRef = useRef<Asset[] | null>(null);
+  const [moved, setMoved] = useState<{ count: number; board: string } | null>(null);
 
   const shouldStartSelecting = useCallback(
     (target: EventTarget | null): boolean => {
@@ -214,6 +224,23 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         drag.active = true;
       }
 
+      // A board under the pointer takes precedence: dropping onto one moves the
+      // assets there, so an insertion point would be misleading.
+      const under = document.elementFromPoint(event.clientX, event.clientY);
+      const boardEl = under?.closest<HTMLElement>("[data-board-id]") ?? null;
+      const boardId = boardEl?.dataset.boardId ?? null;
+      if (boardId !== hoverBoardRef.current) {
+        hoverBoardRef.current = boardId;
+        setHoverBoard(boardId);
+      }
+      if (boardId) {
+        if (dropTargetRef.current) {
+          dropTargetRef.current = null;
+          setDropTarget(null);
+        }
+        return;
+      }
+
       const origin = content.getBoundingClientRect();
       const next = dropTargetAt(
         assetIdsRef.current,
@@ -230,10 +257,27 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     const onUp = (): void => {
       const drag = dragRef.current;
       const target = dropTargetRef.current;
+      const boardId = hoverBoardRef.current;
       dragRef.current = null;
       dropTargetRef.current = null;
+      hoverBoardRef.current = null;
       setDropTarget(null);
-      if (!drag?.active || !target) return;
+      setHoverBoard(null);
+      if (!drag?.active) return;
+
+      if (boardId) {
+        const moving = new Set(drag.ids);
+        setAssets((previous) => {
+          undoRef.current = previous;
+          return previous.filter((asset) => !moving.has(asset.id));
+        });
+        setMoved({ count: drag.ids.length, board: boardTitleById.get(boardId) ?? "" });
+        clear();
+        marqueeMovedRef.current = true;
+        return;
+      }
+
+      if (!target) return;
 
       // Reordering is local: the API exposes no write endpoint for asset order.
       const reordered = moveItems(assetIdsRef.current, drag.ids, target.index);
@@ -254,7 +298,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
       window.removeEventListener("mousemove", onMove);
       window.removeEventListener("mouseup", onUp);
     };
-  }, [contentRef, setAssets]);
+  }, [contentRef, setAssets, clear, boardTitleById]);
 
   const dropIndicator = useMemo(() => {
     if (!dropTarget) return null;
@@ -505,6 +549,7 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
                           width={row.cardWidth}
                           height={row.h}
                           priority={row.index < EAGER_BOARD_ROWS}
+                          highlighted={hoverBoard === board.id}
                         />
                       ))}
                     </div>
@@ -544,6 +589,25 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
           </div>
         </div>
       </div>
+
+      {moved && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-neutral-900 py-2 pl-4 pr-2 text-sm text-white shadow-lg">
+            <span>{COPY.movedToBoard(moved.count, moved.board)}</span>
+            <button
+              type="button"
+              onClick={() => {
+                if (undoRef.current) setAssets(undoRef.current);
+                undoRef.current = null;
+                setMoved(null);
+              }}
+              className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-white/25"
+            >
+              {COPY.undo}
+            </button>
+          </div>
+        </div>
+      )}
 
       {error && (
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800 sm:px-6">
