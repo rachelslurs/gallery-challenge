@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useState } from "react";
 import clsx from "clsx";
 import { COPY } from "@/lib/copy";
 import { thumbnail, thumbnailSrcSet } from "@/lib/imgix";
@@ -37,7 +37,14 @@ export interface AssetCellProps {
 }
 
 const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) => {
+  // Hover lives in the cell rather than the wall. Lifting it would re-render
+  // every mounted tile on each pointer move between tiles; kept local, only the
+  // tile entered and the tile left re-render, and exactly one video is ever
+  // mounted.
+  const [previewing, setPreviewing] = useState(false);
+
   const isVideo = asset.type === "video";
+  const preview = isVideo ? asset.previewVideo : undefined;
   // The image is inset, so it renders narrower than the cell it occupies.
   const imageWidth = Math.max(1, w - IMAGE_INSET * 2);
 
@@ -46,6 +53,10 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
       data-asset-id={asset.id}
       className="group absolute left-0 top-0"
       style={{ transform: `translate3d(${x}px, ${y}px, 0)`, width: w, height: h }}
+      {...(preview && {
+        onMouseEnter: () => setPreviewing(true),
+        onMouseLeave: () => setPreviewing(false),
+      })}
     >
       <div
         className={clsx(
@@ -73,6 +84,23 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           <div className="flex h-full w-full items-center justify-center text-xs text-neutral-500">
             {asset.ext.toUpperCase() || COPY.unknownFileType}
           </div>
+        )}
+
+        {previewing && preview && (
+          /*
+             Mounted only while hovered, so nothing preloads and one video at
+             most is ever decoding. The poster frame stays underneath, which is
+             what the viewer keeps seeing until the first frame arrives.
+          */
+          <video
+            src={preview}
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="none"
+            className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+          />
         )}
 
         {isVideo && (

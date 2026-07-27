@@ -64,17 +64,6 @@ const SelectionBar = ({ count, boardTitle, moved, onClear, onUndo }: SelectionBa
               </span>
             </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <button
-                type="button"
-                className={clsx(pillButton, "border border-white/15 bg-white/10 text-neutral-50 hover:bg-white/20")}
-              >
-                {COPY.download}
-              </button>
-              <button type="button" className={clsx(pillButton, "bg-blue-600 text-white hover:bg-blue-500")}>
-                {COPY.share}
-              </button>
-            </div>
           </>
         )}
       </div>
