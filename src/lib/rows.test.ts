@@ -73,13 +73,25 @@ describe("buildRows layout", () => {
   const { gap } = input.metrics;
   const { rows, height } = buildRows(input);
 
-  it("stacks rows with strictly increasing y, each the previous bottom plus the gap", () => {
+  // Spacing varies by transition: a label hugs the content beneath it and sits
+  // further from the section above. So the invariant is that rows stack without
+  // overlapping, with the row gap as the floor, not that every step is equal.
+  it("stacks rows in order without overlapping, never tighter than the row gap", () => {
     expect(rows.length).toBeGreaterThan(3);
     expect(rows[0].y).toBe(0);
     for (let i = 1; i < rows.length; i += 1) {
+      const previousBottom = rows[i - 1].y + rows[i - 1].h;
       expect(rows[i].y).toBeGreaterThan(rows[i - 1].y);
-      expect(rows[i].y).toBeCloseTo(rows[i - 1].y + rows[i - 1].h + gap, 6);
+      expect(rows[i].y).toBeGreaterThanOrEqual(previousBottom + gap - 1e-6);
     }
+  });
+
+  it("puts more space above a section label than below it", () => {
+    const assetsHeader = rows.findIndex((r) => r.kind === "header" && r.id === "h-assets");
+    expect(assetsHeader).toBeGreaterThan(0);
+    const above = rows[assetsHeader].y - (rows[assetsHeader - 1].y + rows[assetsHeader - 1].h);
+    const below = rows[assetsHeader + 1].y - (rows[assetsHeader].y + rows[assetsHeader].h);
+    expect(above).toBeGreaterThan(below);
   });
 
   it("reports height as the last row's bottom edge", () => {

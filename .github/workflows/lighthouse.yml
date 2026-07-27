@@ -90,9 +90,47 @@ jobs:
       # the representative run. Full reports for every category, performance
       # included, are downloadable from the run's artifacts.
       - name: Lighthouse
+        id: lighthouse
         uses: treosh/lighthouse-ci-action@v12
         with:
           urls: http://localhost:3000
           runs: 3
           configPath: ./lighthouserc.json
           uploadArtifacts: true
+          # Publishes the full interactive report to Google's short-lived public
+          # store and returns its URL, so a run can be inspected without
+          # downloading and unzipping an artifact.
+          temporaryPublicStorage: true
+
+      # Scores land on the run's own summary page, which is the only place
+      # anyone actually looks. `always()` so a failed assertion still reports
+      # the numbers that caused it.
+      - name: Publish scores to the run summary
+        if: always()
+        env:
+          MANIFEST: ${{ steps.lighthouse.outputs.manifest }}
+          LINKS: ${{ steps.lighthouse.outputs.links }}
+        run: |
+          node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const manifest = JSON.parse(process.env.MANIFEST || '[]');
+          const links = JSON.parse(process.env.LINKS || '{}');
+          const run = manifest.find((r) => r.isRepresentativeRun) || manifest[0];
+          if (!run) {
+            console.log('## Lighthouse\n\nNo results were produced.');
+            process.exit(0);
+          }
+          const pct = (v) => `${Math.round(v * 100)}`;
+          const mark = (v, floor) => (v * 100 >= floor ? 'pass' : 'below');
+          const s = run.summary;
+          console.log('## Lighthouse');
+          console.log('');
+          console.log('| Category | Score | Gate |');
+          console.log('| --- | ---: | --- |');
+          console.log(`| Performance | ${pct(s.performance)} | reported only |`);
+          console.log(`| Accessibility | ${pct(s.accessibility)} | ${mark(s.accessibility, 90)} (fails below 90) |`);
+          console.log(`| Best practices | ${pct(s['best-practices'])} | reported only |`);
+          console.log(`| SEO | ${pct(s.seo)} | reported only |`);
+          console.log('');
+          const url = Object.values(links)[0];
+          if (url) console.log(`[Full report](${url})`);
+          NODE

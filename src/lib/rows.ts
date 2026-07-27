@@ -24,8 +24,24 @@ export interface Metrics {
   maxHeight: number;
   gap: number;
   boardColumns: number;
+  /** Height of the section label row itself, snug to the text. */
   headerHeight: number;
+  /** Space below a section label before its first row of content. */
+  headerGap: number;
+  /** Space above a section label when content precedes it. */
+  sectionGap: number;
 }
+
+/**
+ * Vertical rhythm around section labels, measured from the reference gallery at
+ * 1440px: 15px beneath a label and 39px above the next one, measured from image
+ * edge to label. SECTION_GAP is smaller than 39 because a board card carries a
+ * title strip beneath its thumbnail that already contributes vertical space. The
+ * asymmetry is what groups a label with the content it introduces rather than
+ * leaving it floating between two sections.
+ */
+const HEADER_GAP = 15;
+const SECTION_GAP = 20;
 
 /**
  * Layout constants by container width. Row height shrinks on narrow screens so
@@ -49,15 +65,15 @@ export function metricsFor(width: number): Metrics {
   // are therefore set about a quarter above the ~240px the reference gallery
   // actually renders.
   if (width < 480) {
-    return { targetHeight: 230, maxHeight: 290, gap: 0, boardColumns: 2, headerHeight: 48 };
+    return { targetHeight: 230, maxHeight: 290, gap: 0, boardColumns: 2, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
   }
   if (width < 768) {
-    return { targetHeight: 240, maxHeight: 300, gap: 8, boardColumns: 3, headerHeight: 52 };
+    return { targetHeight: 240, maxHeight: 300, gap: 8, boardColumns: 3, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
   }
   if (width < 1280) {
-    return { targetHeight: 255, maxHeight: 320, gap: 8, boardColumns: 4, headerHeight: 56 };
+    return { targetHeight: 255, maxHeight: 320, gap: 8, boardColumns: 4, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
   }
-  return { targetHeight: 260, maxHeight: 325, gap: 8, boardColumns: 5, headerHeight: 56 };
+  return { targetHeight: 260, maxHeight: 325, gap: 8, boardColumns: 5, headerHeight: 30, headerGap: HEADER_GAP, sectionGap: SECTION_GAP };
 }
 
 /** Board cards are a uniform grid: a 4:3 thumbnail plus a fixed label strip. */
@@ -91,17 +107,22 @@ export function buildRows({
   hasMore,
   loading,
 }: BuildRowsInput): BuiltRows {
-  const { gap, headerHeight, boardColumns, targetHeight, maxHeight } = metrics;
+  const { gap, headerHeight, headerGap, sectionGap, boardColumns, targetHeight, maxHeight } = metrics;
   const rows: VRow[] = [];
   let y = 0;
 
-  const push = (row: Unpositioned<VRow>) => {
+  // Spacing is a property of the transition, not of the row: a label sits close
+  // to the content it introduces and far from whatever precedes it.
+  const push = (row: Unpositioned<VRow>, spacingAfter: number = gap) => {
     rows.push({ ...row, y } as VRow);
-    y += row.h + gap;
+    y += row.h + spacingAfter;
   };
 
   if (boards.length > 0) {
-    push({ kind: "header", id: "h-boards", h: headerHeight, section: "boards", title: "Boards", count: boards.length });
+    push(
+      { kind: "header", id: "h-boards", h: headerHeight, section: "boards", title: "Boards", count: boards.length },
+      collapsed.boards ? sectionGap : headerGap,
+    );
 
     if (!collapsed.boards) {
       const columns = Math.max(1, boardColumns);
@@ -117,17 +138,22 @@ export function buildRows({
           cardWidth,
         });
       }
+      // The final board row is followed by a section break, not a row gap.
+      y += sectionGap - gap;
     }
   }
 
-  push({
-    kind: "header",
-    id: "h-assets",
-    h: headerHeight,
-    section: "assets",
-    title: "Assets",
-    count: total || assets.length,
-  });
+  push(
+    {
+      kind: "header",
+      id: "h-assets",
+      h: headerHeight,
+      section: "assets",
+      title: "Assets",
+      count: total || assets.length,
+    },
+    headerGap,
+  );
 
   if (!collapsed.assets) {
     const justified = justify(assets, { containerWidth, targetHeight, gap, maxHeight });
