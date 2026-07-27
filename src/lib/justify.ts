@@ -118,9 +118,13 @@ export function justify<T extends Sized>(
   }
 
   // Trailing items never reached full width. Left-align them at target height
-  // rather than stretching a lone image across the viewport.
+  // rather than stretching a lone image across the viewport, but never let the
+  // row exceed the container: the lookback above can reject a very wide item
+  // from the previous row and leave it stranded here, where at targetHeight a
+  // 16:1 panorama renders 2112px wide inside a 320px column.
   if (start < items.length) {
-    emit(items.length, targetHeight);
+    const fitted = fittedHeight(items.length - start, sumAspect);
+    emit(items.length, Math.min(targetHeight, fitted));
   }
 
   return rows;

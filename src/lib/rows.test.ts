@@ -1,0 +1,184 @@
+import { describe, expect, it } from "vitest";
+import type { Board } from "../app/api/boards";
+import {
+  boardCardHeight,
+  buildRows,
+  metricsFor,
+  type BuildRowsInput,
+  type VRow,
+} from "./rows";
+import type { Asset } from "./useAssets";
+
+/** Deterministic PRNG (mulberry32) so failures reproduce byte for byte. */
+const mulberry32 = (seed: number): (() => number) => {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+};
+
+const makeBoard = (i: number): Board => ({
+  id: `board-${i}`,
+  parentId: null,
+  creatorId: "creator",
+  workspaceId: "workspace",
+  title: `Board ${i}`,
+  description: null,
+  createdAt: "2026-01-01T00:00:00Z",
+  updatedAt: "2026-01-01T00:00:00Z",
+  hasCurrentUser: false,
+  pos: i,
+});
+
+const makeAssets = (count: number, seed: number): Asset[] => {
+  const rand = mulberry32(seed);
+  return Array.from({ length: count }, (_, i) => {
+    const portrait = rand() < 0.5;
+    const long = 800 + Math.floor(rand() * 1200);
+    const short = Math.floor(long / (1.2 + rand() * 1.3));
+    return {
+      id: `asset-${i}`,
+      width: portrait ? short : long,
+      height: portrait ? long : short,
+      title: `Asset ${i}`,
+      image: `https://air-prod.imgix.net/${i}.jpg`,
+      type: "photo",
+      duration: 0,
+      ext: "jpg",
+    };
+  });
+};
+
+const baseInput = (overrides: Partial<BuildRowsInput> = {}): BuildRowsInput => ({
+  boards: Array.from({ length: 7 }, (_, i) => makeBoard(i)),
+  assets: makeAssets(60, 0x0a55e7),
+  containerWidth: 768,
+  metrics: metricsFor(768),
+  collapsed: { boards: false, assets: false },
+  total: 60,
+  hasMore: false,
+  loading: false,
+  ...overrides,
+});
+
+const statusRows = (rows: VRow[]): Extract<VRow, { kind: "status" }>[] =>
+  rows.filter((row): row is Extract<VRow, { kind: "status" }> => row.kind === "status");
+
+describe("buildRows layout", () => {
+  const input = baseInput();
+  const { gap } = input.metrics;
+  const { rows, height } = buildRows(input);
+
+  it("stacks rows with strictly increasing y, each the previous bottom plus the gap", () => {
+    expect(rows.length).toBeGreaterThan(3);
+    expect(rows[0].y).toBe(0);
+    for (let i = 1; i < rows.length; i += 1) {
+      expect(rows[i].y).toBeGreaterThan(rows[i - 1].y);
+      expect(rows[i].y).toBeCloseTo(rows[i - 1].y + rows[i - 1].h + gap, 6);
+    }
+  });
+
+  it("reports height as the last row's bottom edge", () => {
+    const last = rows[rows.length - 1];
+    expect(height).toBeCloseTo(last.y + last.h, 6);
+  });
+
+  it("numbers board rows and asset rows independently from 0", () => {
+    const boardRows = rows.filter(
+      (row): row is Extract<VRow, { kind: "boards" }> => row.kind === "boards",
+    );
+    const assetRows = rows.filter(
+      (row): row is Extract<VRow, { kind: "assets" }> => row.kind === "assets",
+    );
+    // 7 boards over 4 columns is 2 grid rows; 60 assets fill many wall rows.
+    expect(boardRows.length).toBe(2);
+    expect(assetRows.length).toBeGreaterThan(2);
+    boardRows.forEach((row, i) => expect(row.index).toBe(i));
+    assetRows.forEach((row, i) => expect(row.index).toBe(i));
+  });
+
+  it("re-anchors asset cells so each cell's y matches its row", () => {
+    for (const row of rows) {
+      if (row.kind !== "assets") continue;
+      for (const cell of row.cells) {
+        expect(cell.y).toBeCloseTo(row.y, 6);
+        expect(cell.h).toBeCloseTo(row.h, 6);
+      }
+    }
+  });
+});
+
+describe("buildRows collapsing", () => {
+  const headerSections = (rows: VRow[]): string[] =>
+    rows.filter((row) => row.kind === "header").map((row) => (row.kind === "header" ? row.section : ""));
+
+  it("collapsing boards removes board rows but keeps both headers", () => {
+    const { rows } = buildRows(baseInput({ collapsed: { boards: true, assets: false } }));
+    expect(rows.some((row) => row.kind === "boards")).toBe(false);
+    expect(rows.some((row) => row.kind === "assets")).toBe(true);
+    expect(headerSections(rows)).toEqual(["boards", "assets"]);
+  });
+
+  it("collapsing assets removes asset and status rows but keeps both headers", () => {
+    const { rows } = buildRows(baseInput({ collapsed: { boards: false, assets: true } }));
+    expect(rows.some((row) => row.kind === "assets")).toBe(false);
+    expect(statusRows(rows)).toEqual([]);
+    expect(rows.some((row) => row.kind === "boards")).toBe(true);
+    expect(headerSections(rows)).toEqual(["boards", "assets"]);
+  });
+});
+
+describe("buildRows status row", () => {
+  it("shows 'empty' when there are no assets and nothing is loading", () => {
+    const { rows } = buildRows(baseInput({ assets: [], total: 0, loading: false, hasMore: false }));
+    const status = statusRows(rows);
+    expect(status.length).toBe(1);
+    expect(status[0].state).toBe("empty");
+  });
+
+  it("shows 'loading' while more pages remain", () => {
+    const { rows } = buildRows(baseInput({ hasMore: true }));
+    const status = statusRows(rows);
+    expect(status.length).toBe(1);
+    expect(status[0].state).toBe("loading");
+  });
+
+  it("shows 'end' when all assets are loaded", () => {
+    const { rows } = buildRows(baseInput({ hasMore: false }));
+    const status = statusRows(rows);
+    expect(status.length).toBe(1);
+    expect(status[0].state).toBe("end");
+  });
+});
+
+describe("metricsFor", () => {
+  it("uses a smaller row target on phones than on desktops", () => {
+    expect(metricsFor(320).targetHeight).toBeLessThan(metricsFor(1440).targetHeight);
+  });
+
+  it("never returns fewer than 1 board column", () => {
+    for (const width of [0, 1, 319, 320, 479, 480, 767, 768, 1279, 1280, 1440, 5000]) {
+      expect(metricsFor(width).boardColumns).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it("keeps maxHeight at or above targetHeight so justify's ceiling holds", () => {
+    for (const width of [320, 768, 1440]) {
+      const metrics = metricsFor(width);
+      expect(metrics.maxHeight).toBeGreaterThanOrEqual(metrics.targetHeight);
+      expect(metrics.gap).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe("boardCardHeight", () => {
+  it("grows with card width and always clears the label strip", () => {
+    expect(boardCardHeight(200)).toBeGreaterThan(boardCardHeight(100));
+    // Zero-width card still reserves the 44px label strip.
+    expect(boardCardHeight(0)).toBe(44);
+  });
+});
