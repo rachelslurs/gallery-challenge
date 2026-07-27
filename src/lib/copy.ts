@@ -11,6 +11,18 @@ export const COPY = {
   retry: "Retry",
   untitledAsset: "Untitled",
   unknownFileType: "FILE",
+  /** "JPG · 1 MB · 5616 x 3744", the shape the reference gallery uses on hover. */
+  assetMeta: (ext: string, bytes: number | undefined, width: number, height: number): string => {
+    // Guarded rather than trusted: the field is absent on some clips, and an
+    // unguarded divide renders the string "NaN KB" straight into the UI.
+    const parts = [ext.toUpperCase()];
+    if (typeof bytes === "number" && Number.isFinite(bytes) && bytes > 0) {
+      const mb = bytes / 1_000_000;
+      parts.push(mb >= 1 ? `${mb.toFixed(mb >= 10 ? 0 : 1)} MB` : `${Math.round(bytes / 1000)} KB`);
+    }
+    if (width > 0 && height > 0) parts.push(`${width} x ${height}`);
+    return parts.filter(Boolean).join(" · ");
+  },
   assetCount: (count: number): string =>
     `${count.toLocaleString()} ${count === 1 ? "asset" : "assets"}`,
   boardCount: (count: number): string =>

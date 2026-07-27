@@ -117,14 +117,32 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           />
         )}
 
-        {isVideo && (
-          <div className="pointer-events-none absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded bg-black/65 px-1.5 py-0.5 text-[10px] font-medium leading-none tracking-wide text-white">
-            <svg viewBox="0 0 8 10" className="h-2.5 w-2.5 fill-current" aria-hidden>
-              <path d="M0 0l8 5-8 5z" />
-            </svg>
-            {asset.duration > 0 && formatDuration(asset.duration)}
+        {isVideo && asset.duration > 0 && (
+          <div className="pointer-events-none absolute bottom-3 right-3 z-10 rounded-sm bg-black/80 px-1 text-[10px] font-medium leading-4 tracking-[0.1px] text-white">
+            {formatDuration(asset.duration)}
           </div>
         )}
+
+        {/*
+          Filename and specifications over a gradient, revealed on hover. The
+          gradient carries the text rather than sitting behind it as a separate
+          layer, which keeps this to three nodes.
+        */}
+        <div
+          className={clsx(
+            "pointer-events-none absolute inset-x-0 bottom-0 flex flex-col justify-end gap-0.5 p-2",
+            // Arbitrary values on purpose: this project pins Tailwind 3.3,
+            // where min-h-24 does not exist and the gradient-stop utilities
+            // silently produced no background-image.
+            "min-h-[84px] bg-[linear-gradient(to_top,rgba(0,0,0,0.85),transparent)]",
+            "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
+          )}
+        >
+          <p className="truncate text-xs font-medium leading-4 text-white">{asset.title}</p>
+          <p className="truncate text-[11px] leading-4 text-white/70">
+            {asset.meta}
+          </p>
+        </div>
 
         {/*
           Marked with a data attribute rather than given an onClick, so the one
@@ -137,8 +155,8 @@ const AssetCell = ({ asset, x, y, w, h, selected, priority }: AssetCellProps) =>
           data-menu-trigger="asset"
           aria-label={COPY.assetActions}
           className={clsx(
-            "absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-md",
-            "bg-white/90 text-neutral-700 shadow-sm backdrop-blur",
+            "absolute right-2 top-2 z-10 grid h-6 w-6 place-items-center rounded",
+            "bg-black/60 text-white backdrop-blur-sm transition-colors hover:bg-black/80",
             "opacity-0 transition-opacity duration-150 group-hover:opacity-100",
             "focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500",
           )}

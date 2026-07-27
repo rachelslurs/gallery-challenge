@@ -24,6 +24,15 @@ export interface Asset {
   type: Clip["type"];
   duration: number;
   ext: string;
+  /**
+   * Precomputed "JPG · 1.5 MB · 5616 x 3744" for the hover overlay.
+   *
+   * Built once as the asset enters rather than on every render: a cell
+   * re-renders whenever the window moves or its selection flips, and formatting
+   * the same immutable string each time is work with no possible different
+   * answer.
+   */
+  meta: string;
 }
 
 interface AssetPage {
@@ -37,17 +46,20 @@ const normalize = (clip: Clip): Asset => {
   // A quarter-turn means the intrinsic dimensions describe the pre-rotation
   // image, so the layout needs them swapped or the cell is laid out sideways.
   const turned = clip.rotation === 90 || clip.rotation === 270;
+  const width = (turned ? clip.height : clip.width) || 1;
+  const height = (turned ? clip.width : clip.height) || 1;
 
   return {
     id: clip.id,
-    width: (turned ? clip.height : clip.width) || 1,
-    height: (turned ? clip.width : clip.height) || 1,
+    width,
+    height,
     title: clip.title ?? clip.importedName ?? COPY.untitledAsset,
     image: clip.assets?.image ?? "",
     previewVideo: clip.assets?.previewVideo,
     type: clip.type,
     duration: clip.duration ?? 0,
     ext: clip.ext ?? "",
+    meta: COPY.assetMeta(clip.ext ?? "", clip.size, width, height),
   };
 };
 

@@ -49,6 +49,7 @@ const makeAssets = (count: number, seed: number): Asset[] => {
       type: "photo",
       duration: 0,
       ext: "jpg",
+      meta: "JPG · 1.4 MB · 1200 x 800",
     };
   });
 };

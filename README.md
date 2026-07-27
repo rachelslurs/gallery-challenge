@@ -97,13 +97,6 @@ differently.
 - One floating action bar owns everything transient, so the selection count, the undo after a move, and a refusal can never stack or fight for the same corner.
 - `.nvmrc` moved from the starter's 18.17.0 to 22.20.0, a deliberate deviation: vitest 4 requires Node 20 or later, so a CI run honoring the starter's pin would have failed before running a single test.
 
-## Not built
-
-Auto-scroll while a marquee or reorder drag passes the viewport edge. It is not
-in the brief; I started it because dragging past the fold otherwise limits a
-selection to one screenful. `src/lib/autoScroll.ts` holds a tested velocity ramp
-and is not wired to anything.
-
 ## Known gaps
 
 - Boards can be selected and dropped onto, but not moved into one another. Attempting it turns the destination red and explains the refusal rather than failing silently. A mixed selection moves only its assets.
