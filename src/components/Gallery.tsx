@@ -15,6 +15,7 @@ import AssetCell from "./AssetCell";
 import BoardCard from "./BoardCard";
 import GalleryMenu, { type MenuAction, type MenuTarget } from "./GalleryMenu";
 import SectionHeader from "./SectionHeader";
+import SelectionBar from "./SelectionBar";
 
 const OVERSCAN = 3;
 /** Start the next page once the window is this many rows from the end. */
@@ -467,15 +468,6 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
             {initialBoards.length > 0 && ` · ${COPY.boardCount(initialBoards.length)}`}
           </p>
         </div>
-        {count > 0 && (
-          <button
-            type="button"
-            onClick={clear}
-            className="shrink-0 rounded-md bg-blue-600 px-3 py-1.5 text-xs font-medium tabular-nums text-white transition-colors hover:bg-blue-700"
-          >
-            {COPY.selectedCount(count)}
-          </button>
-        )}
       </header>
 
       {/*
@@ -597,24 +589,17 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         </div>
       </div>
 
-      {moved && (
-        <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-full bg-neutral-900 py-2 pl-4 pr-2 text-sm text-white shadow-lg">
-            <span>{COPY.movedToBoard(moved.count, moved.board)}</span>
-            <button
-              type="button"
-              onClick={() => {
-                if (undoRef.current) setAssets(undoRef.current);
-                undoRef.current = null;
-                setMoved(null);
-              }}
-              className="rounded-full bg-white/15 px-3 py-1 text-xs font-medium transition-colors hover:bg-white/25"
-            >
-              {COPY.undo}
-            </button>
-          </div>
-        </div>
-      )}
+      <SelectionBar
+        count={count}
+        boardTitle={boardTitle}
+        moved={moved}
+        onClear={clear}
+        onUndo={() => {
+          if (undoRef.current) setAssets(undoRef.current);
+          undoRef.current = null;
+          setMoved(null);
+        }}
+      />
 
       {error && (
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-800 sm:px-6">
