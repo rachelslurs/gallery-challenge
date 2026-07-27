@@ -86,6 +86,28 @@ fixed. Use a real pointer hover. React's `onMouseLeave` is synthesised from
 Checking that a hover overlay computes `opacity: 0` while not hovering passes
 whether or not the suppression works.
 
+**Viewport emulation resets without saying so.** Closing tabs and reloading
+dropped an emulated 1440x900 back to 500x700 here. The gallery then mounted 20
+tiles instead of 51 and scrolled beautifully, because it was a quarter of the
+work. Assert `window.innerWidth` is what you set before recording anything;
+frame timings are meaningless without the viewport they were taken at.
+
+**Machine load dominates frame timings, by more than the code does.** The same
+build measured an 8ms median scroll idle and 39ms with a dev server and five
+browser tabs alongside it. That is wide enough to invent a regression that does
+not exist, and it did: an afternoon went into hunting a paint cost that was a
+busy laptop. Stop the dev server and close spare tabs before measuring.
+
+**Repeat every run and check for drift.** Three runs reading 56, 58, 85 are not
+a number; three reading 8, 8, 8 are. Monotonic climb across runs means the
+machine is the variable. Report a median of repeated runs, never a single one.
+
+**The guard that makes a browser measurement worth reading**, all four before
+touching a timer: the viewport is what you set, the page hydrated, the data
+finished loading, and the served build is coherent. Return an `aborted` reason
+instead of a number when any fails, so a broken run is obvious rather than
+plausible.
+
 ## Tailwind in this repo
 
 Pinned at 3.3.7, so utilities added in 3.4 silently produce no CSS: `size-*`
