@@ -93,9 +93,9 @@ hydrated, or at the wrong viewport, looks entirely plausible and means nothing.
 
 **Decoration is pseudo-elements, not nodes.** The selection ring and the hover
 tint are `::before` and `::after` rather than two extra divs per cell, and the
-ellipsis is one path rather than three circles. That is 6 DOM nodes per tile
-instead of 11, and 307 in the document instead of 471, with nothing rendering
-differently.
+ellipsis is one path rather than three circles. That saves four nodes a tile: 9
+rather than 13, and across the 51 cells mounted at 1440x900, 509 in the document
+rather than about 713, with nothing rendering differently.
 
 **One menu and one action bar, not one per tile.** Both are driven by a target descriptor at the root. Mounting either per cell would mean 761 of them. The ellipsis is marked with a data attribute rather than given an onClick, so cells still take no callback props and keep their memoization.
 
