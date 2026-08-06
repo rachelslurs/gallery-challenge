@@ -5,19 +5,45 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-npm i            # required first: node_modules is not checked in and not installed
-npm run dev      # dev server on http://localhost:3000
-npm run build    # production build
-npm run lint     # next lint, config is next/core-web-vitals
+npm i             # required first: node_modules is not checked in and not installed
+npm run dev       # dev server on http://localhost:3000
+npm run build     # production build
+npm run lint      # next lint, config is next/core-web-vitals
+npm run typecheck # tsc --noEmit
+npm test          # vitest run
 ```
 
-There is no test framework, no test script, and no test files in this repository. There is no command to run a single test until one is added.
+Tests are vitest, colocated as `src/lib/*.test.ts`, and cover the pure modules only:
+layout, geometry, ordering, selection, menu scoping and imgix URLs. Nothing renders a
+component, so there is no jsdom dependency and the suite runs in well under a second.
 
-## What is built and what is not
+Run one file with `npx vitest run src/lib/justify.test.ts`, or one case with
+`npx vitest run -t "clamps the trailing row"`.
 
-This is a take-home challenge scaffold. The data layer is written and working; the UI is not. `src/app/page.tsx` returns an empty `<main>`. Building the gallery is the task.
+## How the gallery is put together
 
-The Tailwind `content` globs in `tailwind.config.ts` already list `./src/components/**` and `./src/pages/**`. Neither directory exists, which is where new components are expected to go.
+Every clip carries intrinsic `width` and `height`, so the layout is arithmetic and nothing
+measures the DOM. That single fact is what the rest hangs off.
+
+`src/lib` splits in two. The pure half has no React and no DOM, and is where the tests live:
+`justify` (justified-rows layout), `geometry` (binary searches and marquee hit-testing),
+`rows` (one flat row list for headers, boards, assets and status), `reorder`, `selection`,
+`selectionBar`, `menuTarget`, `imgix`. The hook half is `useAssets` (cursor pagination),
+`useSelection`, `useVirtualRange` (windowing plus a ResizeObserver), and `useAssetDrag`
+(both drag gestures).
+
+`src/components` is `Gallery` orchestrating `AssetCell`, `BoardCard`, `GalleryMenu`,
+`SectionHeader` and `SelectionBar`. `app/page.tsx` is a server component that fetches the
+sub-boards and sets `revalidate = 300`; `Gallery` is the client boundary.
+
+Three features read the same geometry array: windowing, marquee hit-testing, and drag
+hit-testing. Changing what `justify` emits affects all three.
+
+Cells take no callback props, deliberately. Clicks, context menus and the ellipsis are all
+handled by delegated listeners on the wall and keyed off `data-asset-id` /
+`data-board-id` / `data-menu-trigger`, because a callback prop would change identity every
+render and defeat `AssetCell`'s memo across all 761 tiles. Adding an `onClick` to a cell is
+the easiest way to regress scroll performance here.
 
 ## `src/app/api/` holds client-side fetch wrappers
 
