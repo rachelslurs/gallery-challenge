@@ -9,7 +9,7 @@ Live: https://gallery-challenge-one.vercel.app
 ```bash
 npm install
 npm run dev    # http://localhost:3000
-npm test       # 118 tests, ~400ms
+npm test       # 124 tests, ~500ms
 ```
 
 ## Requirements status
@@ -99,6 +99,13 @@ rather than about 713, with nothing rendering differently.
 
 **One menu and one action bar, not one per tile.** Both are driven by a target descriptor at the root. Mounting either per cell would mean 761 of them. The ellipsis is marked with a data attribute rather than given an onClick, so cells still take no callback props and keep their memoization.
 
+**A menu scopes itself to its target's own kind.** Boards and assets share one selection
+set, so "how many are selected" is the wrong question for a menu: an asset menu can only
+act on assets. `menuTarget.ts` returns the count and the id list from one function, so the
+label and the action cannot disagree. Deriving them separately is what previously let an
+asset menu read "Remove 13 assets" against a selection of four boards and nine assets, and
+hand those board ids to a URL builder that answered board page links rather than declining.
+
 **Selection is a `Set` of ids, and cells are memoized on a boolean.** A marquee sweep re-renders only the tiles whose membership changed.
 
 **No data-fetching library.** The reorder and move-to-board requirements make the asset list client-owned mutable state, and TanStack Query is a server-state cache. It earns its ~13kB only if the list stays read-only.
@@ -114,7 +121,7 @@ exactly at three viewports: 2 columns at 179x160 with 8px gaps on a phone, 3 at
 
 ## Beyond the brief
 
-- 118 unit tests over the layout and selection maths. Most work the answer out twice, once the quick way the app uses and once the slow obvious way, then check the two match. A mistake has to be made in both to go unnoticed. That is how the suite caught a photo 2112px wide sitting in a 320px column. I also broke the code on purpose five times, one line each, to see whether the tests noticed: they had not, so I wrote the ones that do.
+- 124 unit tests over the layout and selection maths. Most work the answer out twice, once the quick way the app uses and once the slow obvious way, then check the two match. A mistake has to be made in both to go unnoticed. That is how the suite caught a photo 2112px wide sitting in a 320px column. I also broke the code on purpose five times, one line each, to see whether the tests noticed: they had not, so I wrote the ones that do.
 - GitHub Actions CI runs typecheck, lint, tests, and build on every push.
 - Keyboard and modifier selection: shift for ranges, cmd to toggle, cmd+A, Escape. Only marquee selection was asked for.
 - Rotation-aware dimension swapping for assets rotated 90 or 270 degrees.

@@ -6,6 +6,7 @@ import { useSelectionContainer, type Box } from "@air/react-drag-to-select";
 import { boardUrl, type Board } from "@/app/api/boards";
 import { COPY } from "@/lib/copy";
 import { cellsInBox, toContentRect } from "@/lib/geometry";
+import { menuScope } from "@/lib/menuTarget";
 import { moveItems, type Positioned } from "@/lib/reorder";
 import { resolveClick } from "@/lib/selection";
 import { buildRows, metricsFor, type SectionId, type VRow } from "@/lib/rows";
@@ -57,6 +58,10 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const { ref: contentRef, width } = useContainerWidth<HTMLDivElement>();
 
   const assetIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
+  // Boards and assets share one selection set, so telling the two kinds apart
+  // is a membership test. The menus need it to scope themselves to their own
+  // kind; without it an asset menu counts the selected boards too.
+  const assetIdSet = useMemo(() => new Set(assetIds), [assetIds]);
   const { selected, count, selectOnly, toggle, extendTo, selectAll, clear, beginMarquee, applyMarquee } =
     useSelection(assetIds);
 
@@ -356,21 +361,21 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
    * Build a menu target from whatever the pointer landed on. The count comes
    * from the live selection only when the target is part of it, so
    * right-clicking outside a selection acts on that one item, which is what
-   * every file manager does.
+   * every file manager does. `menuScope` also narrows it to the target's own
+   * kind, since an asset menu can only ever act on assets.
    */
   const targetFrom = useCallback(
     (element: Element, x: number, y: number): MenuTarget | null => {
       const assetEl = element.closest<HTMLElement>("[data-asset-id]");
       if (assetEl?.dataset.assetId) {
         const id = assetEl.dataset.assetId;
-        const inSelection = selected.has(id);
         return {
           kind: "asset",
           id,
           title: assetEl.querySelector("img")?.alt ?? "",
           x,
           y,
-          selectionCount: inSelection ? count : 1,
+          selectionCount: menuScope("asset", id, selected, assetIdSet).count,
         };
       }
       const boardEl = element.closest<HTMLElement>("[data-board-id]");
@@ -382,12 +387,12 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
           title: boardEl.textContent?.trim() ?? "",
           x,
           y,
-          selectionCount: selected.has(id) ? count : 1,
+          selectionCount: menuScope("board", id, selected, assetIdSet).count,
         };
       }
       return null;
     },
-    [selected, count],
+    [selected, assetIdSet],
   );
 
   // One delegated handler rather than a callback prop on each of 761 cells,
@@ -453,8 +458,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
   const handleMenuAction = useCallback(
     (action: MenuAction, target: MenuTarget): void => {
-      const targetIds =
-        target.selectionCount > 1 && selected.has(target.id) ? Array.from(selected) : [target.id];
+      // The same derivation the label came from, so what the menu names and what
+      // it acts on cannot drift apart. Deriving them separately is what let
+      // "Download 13 assets" hand four board ids to `urlFor`, which answers a
+      // board page URL rather than declining.
+      const targetIds = menuScope(target.kind, target.id, selected, assetIdSet).ids;
       const urlFor = (id: string): string =>
         boardTitleById.has(id) ? boardUrl(id) : (assetById.get(id)?.image ?? "");
 
@@ -487,12 +495,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       if (action !== "remove" || target.kind !== "asset") return;
       // No write endpoint exists on this API, so removal is local by necessity.
-      const ids = target.selectionCount > 1 ? Array.from(selected) : [target.id];
-      const removing = new Set(ids);
+      const removing = new Set(targetIds);
       setAssets((previous) => previous.filter((asset) => !removing.has(asset.id)));
       clear();
     },
-    [selected, setAssets, clear, boardTitleById, assetById],
+    [selected, assetIdSet, setAssets, clear, boardTitleById, assetById],
   );
 
   // Depends on `rows.length` as well as the visible range: a scroll that stops

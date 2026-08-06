@@ -8,8 +8,9 @@ export const MENU_COPY = {
   removeMany: (n: number): string => `Remove ${n} assets from board`,
   copyLink: "Copy link",
   renameBoard: "Rename board",
+  // No plural form: Open acts on the clicked item however many are selected, so
+  // a counted label would promise something the action does not do.
   openBoard: "Open board",
-  openBoards: (n: number): string => `Open ${n} boards`,
   copyLinks: (n: number): string => `Copy ${n} links`,
   assetMenuLabel: "Asset actions",
   boardMenuLabel: "Board actions",

@@ -69,7 +69,10 @@ const GalleryMenu = ({
 
     if (target.kind === "board") {
       return [
-        { action: "open", label: many ? MENU_COPY.openBoards(count) : MENU_COPY.openBoard },
+        // Not pluralised: opening a dozen tabs from one click is not what anyone
+        // means by "open", so this deliberately acts on the clicked board alone.
+        // A label promising more than that was the mismatch worth removing.
+        { action: "open", label: MENU_COPY.openBoard },
         { action: "copyLink", label: many ? MENU_COPY.copyLinks(count) : MENU_COPY.copyLink },
       ];
     }
@@ -79,7 +82,9 @@ const GalleryMenu = ({
         action: "download",
         label: many ? MENU_COPY.downloadMany(count) : MENU_COPY.downloadOne,
       },
-      { action: "copyLink", label: MENU_COPY.copyLink },
+      // Copy acts on the whole selection, so it counts, exactly as the board
+      // menu does.
+      { action: "copyLink", label: many ? MENU_COPY.copyLinks(count) : MENU_COPY.copyLink },
       {
         action: "remove",
         label: many ? MENU_COPY.removeMany(count) : MENU_COPY.removeOne,
