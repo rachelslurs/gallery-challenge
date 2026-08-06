@@ -54,7 +54,8 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   const [marqueeEnabled, setMarqueeEnabled] = useState(true);
   const [menuTarget, setMenuTarget] = useState<MenuTarget | null>(null);
 
-  const { assets, total, hasMore, loading, error, loadMore, retry, setAssets } = useAssets();
+  const { assets, total, hasMore, loading, error, loadMore, removeAssets, retry, setAssets, setTotal } =
+    useAssets();
   const { ref: contentRef, width } = useContainerWidth<HTMLDivElement>();
 
   const assetIds = useMemo(() => assets.map((asset) => asset.id), [assets]);
@@ -78,6 +79,9 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         hasMore,
         loading,
       }),
+    // `assets`, not `assets.length`: a reorder returns a new array of the same
+    // length, so keying on the length would hand back stale rows and the wall
+    // would keep rendering the old order.
     [initialBoards, assets, width, metrics, collapsed, total, hasMore, loading],
   );
 
@@ -139,9 +143,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
   assetIdsRef.current = assetIds;
 
   const [marqueeActive, setMarqueeActive] = useState(false);
-  // Snapshot for undo. There is no write endpoint, so a move is a local
-  // filter and reversing it means restoring the previous array wholesale.
-  const undoRef = useRef<Asset[] | null>(null);
+  // Snapshot for undo. There is no write endpoint, so a move is a local filter
+  // and reversing it means restoring the previous array wholesale. The count
+  // travels with it: the header reads `total`, so restoring only the array
+  // would leave the two disagreeing.
+  const undoRef = useRef<{ assets: Asset[]; total: number } | null>(null);
   const [moved, setMoved] = useState<{ count: number; board: string } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -251,15 +257,18 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
     ),
     onDropOnBoard: useCallback(
       (boardId, movingIds) => {
-        const moving = new Set(movingIds);
-        setAssets((previous) => {
-          undoRef.current = previous;
-          return previous.filter((asset) => !moving.has(asset.id));
-        });
-        setMoved({ count: movingIds.length, board: boardTitleById.get(boardId) ?? "" });
+        // Snapshotted out here rather than inside a state updater. An updater
+        // runs twice under StrictMode, and the second run would capture the
+        // already-filtered list as the thing to restore.
+        undoRef.current = { assets, total };
+        // Count what actually left, so the bar cannot offer to undo more than
+        // it moved when the selection holds a stale id.
+        const removed = removeAssets(movingIds);
+        if (removed === 0) return;
+        setMoved({ count: removed, board: boardTitleById.get(boardId) ?? "" });
         clear();
       },
-      [setAssets, boardTitleById, clear],
+      [assets, total, removeAssets, boardTitleById, clear],
     ),
     onRefused: useCallback(() => setNotice(COPY.boardIntoBoard), []),
     // A drag ends in a click; swallow it so the drop does not reselect.
@@ -495,11 +504,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
 
       if (action !== "remove" || target.kind !== "asset") return;
       // No write endpoint exists on this API, so removal is local by necessity.
-      const removing = new Set(targetIds);
-      setAssets((previous) => previous.filter((asset) => !removing.has(asset.id)));
+      // It still has to move the board's count, which the section header reads.
+      removeAssets(targetIds);
       clear();
     },
-    [selected, assetIdSet, setAssets, clear, boardTitleById, assetById],
+    [selected, assetIdSet, removeAssets, clear, boardTitleById, assetById],
   );
 
   // Depends on `rows.length` as well as the visible range: a scroll that stops
@@ -707,7 +716,11 @@ const Gallery = ({ initialBoards, boardTitle }: GalleryProps) => {
         moved={moved}
         onClear={clear}
         onUndo={() => {
-          if (undoRef.current) setAssets(undoRef.current);
+          const snapshot = undoRef.current;
+          if (snapshot) {
+            setAssets(snapshot.assets);
+            setTotal(snapshot.total);
+          }
           undoRef.current = null;
           setMoved(null);
         }}

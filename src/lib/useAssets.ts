@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { fetchAssets, type Clip } from "@/app/api/clips";
 import { COPY, ERROR_CONTEXT } from "./copy";
+import { removeByIds } from "./removal";
 import { messageFrom, type Result } from "./result";
 
 /**
@@ -92,7 +93,10 @@ export interface UseAssetsResult {
   error: string | null;
   loadMore: () => void;
   retry: () => void;
+  /** Drop assets locally and keep `total` in step. Returns how many left. */
+  removeAssets: (ids: readonly string[]) => number;
   setAssets: Dispatch<SetStateAction<Asset[]>>;
+  setTotal: Dispatch<SetStateAction<number>>;
 }
 
 /**
@@ -114,6 +118,13 @@ export const useAssets = (): UseAssetsResult => {
   const exhaustedRef = useRef(false);
   const cancelledRef = useRef(false);
   const seenRef = useRef(new Set<string>());
+
+  // Mirrored so a removal can read the current list and count without closing
+  // over them, which would rebuild the callback on every loaded page.
+  const assetsRef = useRef(assets);
+  assetsRef.current = assets;
+  const totalRef = useRef(total);
+  totalRef.current = total;
 
   const loadMore = useCallback((): void => {
     if (inFlightRef.current || exhaustedRef.current) return;
@@ -154,6 +165,31 @@ export const useAssets = (): UseAssetsResult => {
     loadMore();
   }, [loadMore]);
 
+  /**
+   * Drop assets from the loaded list, and move `total` with them.
+   *
+   * `total` is the board's count from the API, and the section header renders
+   * it, so a removal that touches only the array leaves the header reporting a
+   * number the wall no longer matches.
+   *
+   * Read through refs and computed before either setter, so both updaters stay
+   * pure: React invokes an updater twice under StrictMode, which would double
+   * any counting done inside one.
+   *
+   * Removed ids stay in `seenRef` on purpose. A later cursor page can still
+   * carry an asset removed here, and forgetting it would let that page put the
+   * asset back.
+   */
+  const removeAssets = useCallback((ids: readonly string[]): number => {
+    const current = assetsRef.current;
+    const next = removeByIds(current, totalRef.current, ids);
+    if (next.items === current) return 0;
+
+    setAssets(next.items);
+    setTotal(next.total);
+    return current.length - next.items.length;
+  }, []);
+
   useEffect(() => {
     cancelledRef.current = false;
     loadMore();
@@ -162,5 +198,5 @@ export const useAssets = (): UseAssetsResult => {
     };
   }, [loadMore]);
 
-  return { assets, total, hasMore, loading, error, loadMore, retry, setAssets };
+  return { assets, total, hasMore, loading, error, loadMore, removeAssets, retry, setAssets, setTotal };
 };
