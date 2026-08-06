@@ -37,3 +37,7 @@ next-env.d.ts
 
 # the challenge brief, kept locally rather than published in the submission
 ASSIGNMENT.md
+
+# local scratch and editor settings
+src/lib/caller.js
+.vscode/
